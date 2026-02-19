@@ -10,6 +10,10 @@ type Props = {
   onDeleteTask: () => void;
   onClearPartitions: () => void;
   onDeleteRange: (range: TaskRange, mode: string) => void;
+  isDeletingTask: boolean;
+  isClearingPartitions: boolean;
+  deletingRangeKey: string | null;
+  deletingRangeMode: string | null;
 };
 
 export default function TaskDetail({
@@ -19,7 +23,11 @@ export default function TaskDetail({
   ranges,
   onDeleteTask,
   onClearPartitions,
-  onDeleteRange
+  onDeleteRange,
+  isDeletingTask,
+  isClearingPartitions,
+  deletingRangeKey,
+  deletingRangeMode
 }: Props) {
   if (!task) {
     return (
@@ -68,27 +76,31 @@ export default function TaskDetail({
                 {new Date(range.timeFrom).toLocaleString()} - {new Date(range.timeTo).toLocaleString()}
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
+                {(() => {
+                  const rangeKey = `${range.timeFrom}-${range.timeTo}`;
+                  const isDeletingPartitions = deletingRangeKey === rangeKey && deletingRangeMode === "partitions";
+                  const isDeletingRange = deletingRangeKey === rangeKey && deletingRangeMode === "range";
+                  return (
+                    <>
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "partitions")}
+                  disabled={isDeletingPartitions}
                   className="btn-hover rounded-lg border border-amber-400/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-amber-100"
                 >
-                  מחק פרטישנים
+                  {isDeletingPartitions ? "מוחק..." : "מחק פרטישנים"}
                 </button>
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "range")}
+                  disabled={isDeletingRange}
                   className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200"
                 >
-                  מחק טווח
+                  {isDeletingRange ? "מוחק..." : "מחק טווח"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteRange(range, "all")}
-                  className="btn-hover rounded-lg border border-rose-500/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-rose-200"
-                >
-                  מחק הכל
-                </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ))}
@@ -99,16 +111,18 @@ export default function TaskDetail({
         <button
           type="button"
           onClick={onClearPartitions}
+          disabled={isClearingPartitions}
           className="btn-hover rounded-xl border border-amber-400/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-amber-100"
         >
-          נקה פרטישנים
+          {isClearingPartitions ? "מנקה..." : "נקה פרטישנים"}
         </button>
         <button
           type="button"
           onClick={onDeleteTask}
+          disabled={isDeletingTask}
           className="btn-hover rounded-xl border border-rose-500/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
         >
-          מחק משימה
+          {isDeletingTask ? "מוחק..." : "מחק משימה"}
         </button>
       </div>
     </div>

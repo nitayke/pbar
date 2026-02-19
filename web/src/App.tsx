@@ -117,6 +117,11 @@ export default function App() {
   const [partitionSizeSeconds, setPartitionSizeSeconds] = useState<number>(300);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
+  const [isClearingPartitions, setIsClearingPartitions] = useState(false);
+  const [deletingRangeKey, setDeletingRangeKey] = useState<string | null>(null);
+  const [deletingRangeMode, setDeletingRangeMode] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedTask = useMemo(
@@ -247,6 +252,7 @@ export default function App() {
   const onCreateTask = async (event: FormEvent) => {
     event.preventDefault();
     setMessage(null);
+    setIsCreatingTask(true);
 
     const payload: TaskCreateRequest = {
       taskId: newTaskId.trim(),
@@ -267,6 +273,8 @@ export default function App() {
       fetchTasks();
     } catch (error) {
       setMessage((error as Error).message);
+    } finally {
+      setIsCreatingTask(false);
     }
   };
 
@@ -274,12 +282,17 @@ export default function App() {
     if (!selectedTaskId) {
       return;
     }
-    await api.deleteTask(selectedTaskId);
-    setSelectedTaskId(null);
-    setSelectedRanges([]);
-    setSelectedHistogram(null);
-    setIsDetailOpen(false);
-    fetchTasks();
+    setIsDeletingTask(true);
+    try {
+      await api.deleteTask(selectedTaskId);
+      setSelectedTaskId(null);
+      setSelectedRanges([]);
+      setSelectedHistogram(null);
+      setIsDetailOpen(false);
+      fetchTasks();
+    } finally {
+      setIsDeletingTask(false);
+    }
   };
 
   const onOpenDetail = (taskId: string) => {
@@ -298,18 +311,31 @@ export default function App() {
     if (!selectedTaskId) {
       return;
     }
-    await api.deletePartitions(selectedTaskId);
-    fetchTasks();
+    setIsClearingPartitions(true);
+    try {
+      await api.deletePartitions(selectedTaskId);
+      fetchTasks();
+    } finally {
+      setIsClearingPartitions(false);
+    }
   };
 
   const onDeleteRange = async (range: TaskRange, mode: string) => {
     if (!selectedTaskId) {
       return;
     }
-    await api.deleteRange(selectedTaskId, range.timeFrom, range.timeTo, mode);
-    const ranges = await api.getTaskRanges(selectedTaskId);
-    setSelectedRanges(ranges);
-    fetchTasks();
+    const rangeKey = `${range.timeFrom}-${range.timeTo}`;
+    setDeletingRangeKey(rangeKey);
+    setDeletingRangeMode(mode);
+    try {
+      await api.deleteRange(selectedTaskId, range.timeFrom, range.timeTo, mode);
+      const ranges = await api.getTaskRanges(selectedTaskId);
+      setSelectedRanges(ranges);
+      fetchTasks();
+    } finally {
+      setDeletingRangeKey(null);
+      setDeletingRangeMode(null);
+    }
   };
 
   return (
@@ -474,13 +500,13 @@ export default function App() {
               <RangeEditor ranges={newRanges} onChange={setNewRanges} />
               <button
                 type="submit"
-                className="w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+                disabled={isCreatingTask}
+                className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
               >
-                צור משימה
+                {isCreatingTask ? "יוצר..." : "צור משימה"}
               </button>
             </form>
             {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
-          </div>
           </div>
         )}
 
@@ -505,6 +531,10 @@ export default function App() {
                 onDeleteTask={onDeleteTask}
                 onClearPartitions={onClearPartitions}
                 onDeleteRange={onDeleteRange}
+                isDeletingTask={isDeletingTask}
+                isClearingPartitions={isClearingPartitions}
+                deletingRangeKey={deletingRangeKey}
+                deletingRangeMode={deletingRangeMode}
               />
             </div>
           </div>
