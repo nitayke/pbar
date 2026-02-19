@@ -1,4 +1,11 @@
-import type { TaskCreateRequest, TaskMetrics, TaskProgress, TaskRange, TaskSummary } from "./types";
+import type {
+  TaskCreateRequest,
+  TaskMetrics,
+  TaskProgress,
+  TaskRange,
+  TaskStatusHistogram,
+  TaskSummary
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:5000/api";
 const rawMock = import.meta.env.VITE_USE_MOCK;
@@ -60,7 +67,7 @@ const mockState: Record<string, { lastTick: number }> = {};
 
 const mockTasks: TaskSummary[] = [
   {
-    taskId: "reflow_batch_01",
+    taskId: "reflow-cars-elastic-west-to-elastic-east",
     description: "בדיקת ריפלו",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
     createdBy: "dana",
@@ -69,7 +76,7 @@ const mockTasks: TaskSummary[] = [
     progress: buildProgress(1200, 820, 210)
   },
   {
-    taskId: "hermetics_line_07",
+    taskId: "hermetics-boys-oracle-east-to-elastic-west",
     description: "שיפור תהליך",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
     createdBy: "yossi",
@@ -78,7 +85,7 @@ const mockTasks: TaskSummary[] = [
     progress: buildProgress(900, 420, 190)
   },
   {
-    taskId: "ops_misc_44",
+    taskId: "reflow-boys-oracle-west-to-elastic-east",
     description: "תחזוקה",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
     createdBy: "alice",
@@ -89,7 +96,7 @@ const mockTasks: TaskSummary[] = [
 ];
 
 const mockRanges: Record<string, TaskRange[]> = {
-  reflow_batch_01: [
+  "reflow-cars-elastic-west-to-elastic-east": [
     {
       timeFrom: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
       timeTo: new Date(Date.now() - 1000 * 60 * 120).toISOString()
@@ -99,13 +106,13 @@ const mockRanges: Record<string, TaskRange[]> = {
       timeTo: new Date(Date.now() - 1000 * 60 * 60).toISOString()
     }
   ],
-  hermetics_line_07: [
+  "hermetics-boys-oracle-east-to-elastic-west": [
     {
       timeFrom: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
       timeTo: new Date(Date.now() - 1000 * 60 * 180).toISOString()
     }
   ],
-  ops_misc_44: [
+  "reflow-boys-oracle-west-to-elastic-east": [
     {
       timeFrom: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
       timeTo: new Date(Date.now() - 1000 * 60 * 30).toISOString()
@@ -128,27 +135,56 @@ const buildSamples = (total: number, done: number, points = 8) => {
 };
 
 const mockMetrics: Record<string, TaskMetrics> = {
-  reflow_batch_01: {
+  "reflow-cars-elastic-west-to-elastic-east": {
     progress: buildProgress(1200, 820, 210),
     partitionsPerMinute: 14.2,
     estimatedMinutesRemaining: 18.5,
     estimatedFinishUtc: new Date(Date.now() + 1000 * 60 * 19).toISOString(),
     samples: buildSamples(1200, 820)
   },
-  hermetics_line_07: {
+  "hermetics-boys-oracle-east-to-elastic-west": {
     progress: buildProgress(900, 420, 190),
     partitionsPerMinute: 9.6,
     estimatedMinutesRemaining: 30.2,
     estimatedFinishUtc: new Date(Date.now() + 1000 * 60 * 30).toISOString(),
     samples: buildSamples(900, 420)
   },
-  ops_misc_44: {
+  "reflow-boys-oracle-west-to-elastic-east": {
     progress: buildProgress(300, 120, 30),
     partitionsPerMinute: 4.3,
     estimatedMinutesRemaining: 26.4,
     estimatedFinishUtc: new Date(Date.now() + 1000 * 60 * 26).toISOString(),
     samples: buildSamples(300, 120)
   }
+};
+
+const buildMockStatusHistogram = (taskId: string, intervalSeconds = 300): TaskStatusHistogram => {
+  const task = mockTasks.find(entry => entry.taskId === taskId);
+  const progress = task?.progress ?? buildProgress(0, 0, 0);
+  const bucketCount = 12;
+
+  const buckets = Array.from({ length: bucketCount }, (_, index) => {
+    const ratio = (index + 1) / bucketCount;
+    const done = Math.round(progress.done * ratio);
+    const inProgress = Math.round(progress.inProgress * ratio);
+    const todo = Math.max(0, progress.total - done - inProgress);
+
+    const statuses = [
+      { status: "done", count: done },
+      { status: "in_progress", count: inProgress },
+      { status: "todo", count: todo }
+    ].filter(item => item.count > 0);
+
+    return {
+      timestampUtc: new Date(Date.now() - (bucketCount - index) * intervalSeconds * 1000).toISOString(),
+      statuses
+    };
+  });
+
+  return {
+    intervalSeconds,
+    buckets
+  };
 };
 
 const advanceTask = (taskId: string) => {
@@ -225,6 +261,11 @@ const mockApi = {
       progress: buildProgress(0, 0, 0),
       samples: []
     };
+  },
+
+  getStatusHistogram: async (taskId: string, intervalSeconds?: number) => {
+    advanceTask(taskId);
+    return buildMockStatusHistogram(taskId, intervalSeconds ?? 300);
   },
 
   createTask: async (payload: TaskCreateRequest) => {
@@ -319,6 +360,11 @@ export const api = USE_MOCK
 
       getMetrics: (taskId: string) =>
         request<TaskMetrics>(`/tasks/${encodeURIComponent(taskId)}/metrics`),
+
+      getStatusHistogram: (taskId: string, intervalSeconds?: number) =>
+        request<TaskStatusHistogram>(
+          `/tasks/${encodeURIComponent(taskId)}/status-histogram${buildQuery({ intervalSeconds })}`
+        ),
 
       createTask: (payload: TaskCreateRequest) =>
         request(`/tasks`, { method: "POST", body: JSON.stringify(payload) }),

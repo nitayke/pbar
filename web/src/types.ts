@@ -37,6 +37,21 @@ export type TaskMetrics = {
   samples: TaskMetricSample[];
 };
 
+export type TaskStatusCount = {
+  status: string;
+  count: number;
+};
+
+export type TaskStatusHistogramBucket = {
+  timestampUtc: string;
+  statuses: TaskStatusCount[];
+};
+
+export type TaskStatusHistogram = {
+  intervalSeconds: number;
+  buckets: TaskStatusHistogramBucket[];
+};
+
 export type TaskCreateRequest = {
   taskId: string;
   description?: string;

@@ -1,11 +1,12 @@
-import type { TaskMetrics, TaskProgress, TaskRange, TaskSummary } from "../types";
+import type { TaskMetrics, TaskProgress, TaskRange, TaskStatusHistogram, TaskSummary } from "../types";
 import ProgressBar from "./ProgressBar";
-import VelocityChart from "./VelocityChart";
+import StatusHistogramChart from "./StatusHistogramChart";
 
 type Props = {
   task: TaskSummary | null;
   progress: TaskProgress | null;
   metrics: TaskMetrics | null;
+  histogram: TaskStatusHistogram | null;
   ranges: TaskRange[];
   onDeleteTask: () => void;
   onClearPartitions: () => void;
@@ -16,6 +17,7 @@ export default function TaskDetail({
   task,
   progress,
   metrics,
+  histogram,
   ranges,
   onDeleteTask,
   onClearPartitions,
@@ -63,7 +65,7 @@ export default function TaskDetail({
             {metrics?.partitionsPerMinute ? `${metrics.partitionsPerMinute} פרטישנים/דקה` : "קצב לא ידוע"}
           </div>
         </div>
-        <VelocityChart samples={metrics?.samples ?? []} />
+        <StatusHistogramChart histogram={histogram} />
       </div>
 
       <div className="mt-6">

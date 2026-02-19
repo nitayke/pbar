@@ -156,6 +156,93 @@ app.MapGet("/api/tasks/{taskId}/metrics", (string taskId, TaskMetricsCache cache
     return Results.Ok(cache.Get(taskId));
 });
 
+app.MapGet("/api/tasks/{taskId}/status-histogram", async (
+    string taskId,
+    int? intervalSeconds,
+    DateTime? from,
+    DateTime? to,
+    AppDbContext db) =>
+{
+    var task = await db.Tasks
+        .AsNoTracking()
+        .Where(t => t.TaskId == taskId)
+        .Select(t => new { t.TaskId, t.PartitionSizeSeconds })
+        .FirstOrDefaultAsync();
+
+    if (task is null)
+    {
+        return Results.NotFound();
+    }
+
+    var effectiveInterval = Math.Clamp(intervalSeconds ?? task.PartitionSizeSeconds ?? 300, 1, 86400);
+
+    var query = db.TaskPartitions
+        .AsNoTracking()
+        .Where(p => p.TaskId == taskId);
+
+    if (from.HasValue)
+    {
+        query = query.Where(p => p.TimeFrom >= from.Value);
+    }
+
+    if (to.HasValue)
+    {
+        query = query.Where(p => p.TimeFrom < to.Value);
+    }
+
+    var rows = await query
+        .Select(p => new { p.TimeFrom, p.Status })
+        .ToListAsync();
+
+    var buckets = new Dictionary<DateTime, Dictionary<string, long>>();
+
+    foreach (var row in rows)
+    {
+        var utc = row.TimeFrom.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(row.TimeFrom, DateTimeKind.Utc)
+            : row.TimeFrom.ToUniversalTime();
+
+        var epoch = new DateTimeOffset(utc).ToUnixTimeSeconds();
+        var bucketEpoch = (epoch / effectiveInterval) * effectiveInterval;
+        var bucketTime = DateTimeOffset.FromUnixTimeSeconds(bucketEpoch).UtcDateTime;
+
+        var status = string.IsNullOrWhiteSpace(row.Status)
+            ? "unknown"
+            : row.Status.Trim().ToLowerInvariant();
+
+        if (!buckets.TryGetValue(bucketTime, out var statusMap))
+        {
+            statusMap = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            buckets[bucketTime] = statusMap;
+        }
+
+        statusMap.TryGetValue(status, out var current);
+        statusMap[status] = current + 1;
+    }
+
+    var dto = new TaskStatusHistogramDto
+    {
+        IntervalSeconds = effectiveInterval,
+        Buckets = buckets
+            .OrderBy(entry => entry.Key)
+            .Select(entry => new TaskStatusHistogramBucketDto
+            {
+                TimestampUtc = entry.Key,
+                Statuses = entry.Value
+                    .OrderBy(pair => pair.Key)
+                    .Select(pair => new TaskStatusCountDto
+                    {
+                        Status = pair.Key,
+                        Count = pair.Value
+                    })
+                    .ToList()
+            })
+            .ToList()
+    };
+
+    return Results.Ok(dto);
+});
+
 app.MapGet("/api/tasks/{taskId}/partitions", async (
     string taskId,
     int? skip,
