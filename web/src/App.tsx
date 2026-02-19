@@ -33,14 +33,14 @@ const parseTaskMeta = (taskId: string) => {
   };
 };
 
-type FilterDropdownProps = {
+type FilterChipsProps = {
   label: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
 };
 
-function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps) {
+function FilterChips({ label, value, options, onChange }: FilterChipsProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -63,18 +63,18 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
 
   return (
     <div ref={rootRef} className="relative">
-      <label className="mb-1 block text-xs uppercase tracking-[0.2em] text-slate-400">{label}</label>
+      <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">{label}</label>
       <button
         type="button"
         onClick={() => setOpen(previous => !previous)}
-        className="btn-hover flex w-full items-center justify-between rounded-md border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
+        className="btn-hover flex w-full items-center justify-between rounded-lg border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
       >
         <span>{getOptionLabel(value)}</span>
         <span className="text-slate-400">▾</span>
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-600 bg-slate-950/95 p-1 shadow-lg shadow-slate-950/50">
+        <div className="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-600 bg-slate-950/95 p-1 shadow-lg shadow-slate-950/50">
           {allOptions.map(option => {
             const isActive = value === option;
             return (
@@ -101,6 +101,7 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
 
 export default function App() {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
   const [filterType, setFilterType] = useState("all");
   const [materialFilter, setMaterialFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -203,10 +204,13 @@ export default function App() {
       setTasks(data);
     } catch (error) {
       setMessage((error as Error).message);
+    } finally {
+      setIsLoadingTasks(false);
     }
   };
 
   useEffect(() => {
+    setIsLoadingTasks(true);
     fetchTasks();
   }, [filterType, search]);
 
@@ -467,56 +471,84 @@ export default function App() {
         <div className="grid h-[calc(100vh-124px)] gap-4 lg:grid-cols-[360px,1fr]">
           <div className="glass relative z-20 rounded-3xl p-4">
             <div className="text-xs uppercase tracking-[0.3em] text-slate-400">סינון</div>
-            <div className="mt-3 space-y-2">
+            <div className="mt-4 space-y-5">
               <input
                 value={search}
                 onChange={event => setSearch(event.target.value)}
                 placeholder="חיפוש לפי מזהה"
                 className="w-full rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
               />
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: "all", label: "הכל" },
-                  { value: "reflow", label: "ריפלו" },
-                  { value: "hermetics", label: "הרמטיות" },
-                  { value: "other", label: "אחר" }
-                ].map(type => (
+
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">סוג משימה</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "all", label: "הכל" },
+                    { value: "reflow", label: "ריפלו" },
+                    { value: "hermetics", label: "הרמטיות" },
+                    { value: "other", label: "אחר" }
+                  ].map(type => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => setFilterType(type.value)}
+                      className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
+                        filterType === type.value
+                          ? "bg-white text-slate-900"
+                          : "btn-hover border border-slate-600 text-slate-200"
+                      }`}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">סוג חומר</label>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={type.value}
                     type="button"
-                    onClick={() => setFilterType(type.value)}
-                    className={`rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em] ${
-                      filterType === type.value
-                        ? "bg-white text-slate-900"
+                    onClick={() => setMaterialFilter("all")}
+                    className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
+                      materialFilter === "all"
+                        ? "bg-cyan-400/20 text-cyan-100"
                         : "btn-hover border border-slate-600 text-slate-200"
                     }`}
                   >
-                    {type.label}
+                    הכל
                   </button>
-                ))}
+                  {materialOptions.map(option => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setMaterialFilter(option)}
+                      className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
+                        materialFilter === option
+                          ? "bg-cyan-400/20 text-cyan-100"
+                          : "btn-hover border border-slate-600 text-slate-200"
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <FilterDropdown
-                  label="סוג חומר"
-                  value={materialFilter}
-                  options={materialOptions}
-                  onChange={setMaterialFilter}
-                />
 
-                <FilterDropdown
-                  label="מקור מידע"
-                  value={sourceFilter}
-                  options={sourceOptions}
-                  onChange={setSourceFilter}
-                />
+              <FilterChips
+                label="מקור מידע"
+                value={sourceFilter}
+                options={sourceOptions}
+                onChange={setSourceFilter}
+              />
 
-                <FilterDropdown
-                  label="יעד מידע"
-                  value={targetFilter}
-                  options={targetOptions}
-                  onChange={setTargetFilter}
-                />
-              </div>
+              <FilterChips
+                label="יעד מידע"
+                value={targetFilter}
+                options={targetOptions}
+                onChange={setTargetFilter}
+              />
+
               <div className="flex items-center gap-3">
                 <label className="text-xs uppercase tracking-[0.2em] text-slate-400">רענון (ש')</label>
                 <input
@@ -544,11 +576,18 @@ export default function App() {
                   onSelect={onOpenDetail}
                 />
               ))}
-              {filteredTasks.length === 0 && (
+              {isLoadingTasks && filteredTasks.length === 0 && (
                 <div className="space-y-3">
                   <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
                   <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
                   <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
+                </div>
+              )}
+              {!isLoadingTasks && filteredTasks.length === 0 && (
+                <div className="flex h-full items-center justify-center text-slate-400">
+                  <div className="text-center">
+                    <div className="text-sm">אין משימות</div>
+                  </div>
                 </div>
               )}
             </div>
