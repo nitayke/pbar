@@ -73,23 +73,24 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
 
       {open && (
         <div className="absolute z-50 mt-2 w-full rounded-xl border border-slate-600 bg-slate-950/95 p-1 shadow-lg shadow-slate-950/50">
-          {allOptions.map(option => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => {
-                onChange(option);
-                setOpen(false);
-              }}
-              className={`btn-hover mb-1 w-full rounded-lg px-3 py-2 text-right text-sm transition last:mb-0 ${
-                value === option
-                  ? "bg-cyan-500/20 text-cyan-100"
-                  : "text-slate-200 hover:bg-slate-800/80"
-              }`}
-            >
-              {getOptionLabel(option)}
-            </button>
-          ))}
+          {allOptions.map(option => {
+            const isActive = value === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => {
+                  onChange(option);
+                  setOpen(false);
+                }}
+                className={`btn-hover mb-1 w-full rounded-lg px-3 py-2 text-right text-sm transition last:mb-0 ${
+                  isActive ? "bg-cyan-500/20 text-cyan-100" : "text-slate-200 hover:bg-slate-800/80"
+                }`}
+              >
+                {getOptionLabel(option)}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -449,64 +450,65 @@ export default function App() {
 
         {isCreateOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
-          <div className="glass max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-xs uppercase tracking-[0.3em] text-slate-400">יצירת משימה</div>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-                className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
-              >
-                סגור
-              </button>
-            </div>
-
-            <form className="space-y-3" onSubmit={onCreateTask}>
-              <input
-                value={newTaskId}
-                onChange={event => setNewTaskId(event.target.value)}
-                placeholder="מזהה משימה"
-                className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                required
-              />
-              <input
-                value={newDescription}
-                onChange={event => setNewDescription(event.target.value)}
-                placeholder="תיאור"
-                className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-              />
-              <input
-                list="user-options"
-                value={newCreatedBy}
-                onChange={event => setNewCreatedBy(event.target.value)}
-                placeholder="נוצר על ידי"
-                className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-              />
-              <datalist id="user-options">
-                {userOptions.map(user => (
-                  <option key={user} value={user} />
-                ))}
-              </datalist>
-              <div className="flex items-center gap-3">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">שניות חלוקה</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={partitionSizeSeconds}
-                  onChange={event => setPartitionSizeSeconds(Number(event.target.value))}
-                  className="w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                />
+            <div className="glass max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">יצירת משימה</div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
+                >
+                  סגור
+                </button>
               </div>
-              <RangeEditor ranges={newRanges} onChange={setNewRanges} />
-              <button
-                type="submit"
-                disabled={isCreatingTask}
-                className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
-              >
-                {isCreatingTask ? "יוצר..." : "צור משימה"}
-              </button>
-            </form>
-            {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
+
+              <form className="space-y-3" onSubmit={onCreateTask}>
+                <input
+                  value={newTaskId}
+                  onChange={event => setNewTaskId(event.target.value)}
+                  placeholder="מזהה משימה"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                  required
+                />
+                <input
+                  value={newDescription}
+                  onChange={event => setNewDescription(event.target.value)}
+                  placeholder="תיאור"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                />
+                <input
+                  list="user-options"
+                  value={newCreatedBy}
+                  onChange={event => setNewCreatedBy(event.target.value)}
+                  placeholder="נוצר על ידי"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                />
+                <datalist id="user-options">
+                  {userOptions.map(user => (
+                    <option key={user} value={user} />
+                  ))}
+                </datalist>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400">שניות חלוקה</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={partitionSizeSeconds}
+                    onChange={event => setPartitionSizeSeconds(Number(event.target.value))}
+                    className="w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                  />
+                </div>
+                <RangeEditor ranges={newRanges} onChange={setNewRanges} />
+                <button
+                  type="submit"
+                  disabled={isCreatingTask}
+                  className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+                >
+                  {isCreatingTask ? "יוצר..." : "צור משימה"}
+                </button>
+              </form>
+              {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
+            </div>
           </div>
         )}
 
