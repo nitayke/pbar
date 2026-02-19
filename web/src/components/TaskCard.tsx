@@ -30,7 +30,7 @@ export default function TaskCard({ task, selected, onSelect }: Props) {
         </div>
         <div className="text-xs text-slate-400">{new Date(task.lastUpdate).toLocaleString()}</div>
       </div>
-      <p className="mt-2 text-sm text-slate-300">{task.description || "ללא תיאור"}</p>
+      <p className="task-description mt-2 max-h-16 overflow-y-auto pr-1 text-sm text-slate-300">{task.description || "ללא תיאור"}</p>
       <div className="mt-3">
         <ProgressBar progress={task.progress} />
       </div>

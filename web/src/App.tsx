@@ -236,9 +236,7 @@ export default function App() {
     };
 
     fetchDetail();
-    const handle = setInterval(fetchDetail, pollSeconds * 1000);
-    return () => clearInterval(handle);
-  }, [selectedTaskId, pollSeconds, selectedTask?.partitionSizeSeconds]);
+  }, [selectedTaskId, selectedTask?.partitionSizeSeconds]);
 
   useEffect(() => {
     if (!newCreatedBy) {
@@ -396,7 +394,7 @@ export default function App() {
         <header className="mb-4 flex items-start justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-[0.6em] text-slate-400">בקרת משימות</div>
-          <h1 className="mt-2 font-display text-4xl text-white">סרגל פרטישנים</h1>
+          <h1 className="mt-2 font-display text-4xl text-white">PBAR 2.0</h1>
         </div>
         <button
           type="button"

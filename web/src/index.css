@@ -17,6 +17,53 @@ body {
   min-height: 100vh;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.45) rgba(15, 23, 42, 0.6);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.45);
+  border-radius: 999px;
+  border: 2px solid rgba(15, 23, 42, 0.7);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.7);
+}
+
+.task-description {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.35) transparent;
+}
+
+.task-description::-webkit-scrollbar {
+  width: 3px;
+}
+
+.task-description::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.task-description::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.35);
+  border-radius: 999px;
+}
+
+.task-description::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.55);
+}
+
 .glass {
   background: rgba(2, 6, 23, 0.9);
   border: 1px solid rgba(148, 163, 184, 0.35);

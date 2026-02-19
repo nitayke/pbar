@@ -14,7 +14,7 @@ const USE_MOCK = rawMock === undefined
   ? true
   : String(rawMock).toLowerCase() === "true" || String(rawMock) === "1";
 const MOCK_DELAY_MS = rawMockDelay === undefined
-  ? 800
+  ? 0
   : Math.max(0, Number(rawMockDelay));
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
