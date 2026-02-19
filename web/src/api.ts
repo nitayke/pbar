@@ -354,6 +354,34 @@ const mockApi = {
     mockState[payload.taskId] = { lastTick: Date.now() };
   },
 
+  addTaskRange: async (taskId: string, range: TaskRange) => {
+    await delay(MOCK_DELAY_MS);
+    const task = mockTasks.find(t => t.taskId === taskId);
+    if (!task) {
+      throw new Error("Task not found");
+    }
+    if (!mockRanges[taskId]) {
+      mockRanges[taskId] = [];
+    }
+    mockRanges[taskId].push(range);
+    if (task.progress) {
+      task.progress.total += 120;
+      task.progress.todo += 120;
+      task.progress.percentDone = (task.progress.done / task.progress.total) * 100;
+      task.progress.percentInProgress = (task.progress.inProgress / task.progress.total) * 100;
+      task.progress.percentTodo = (task.progress.todo / task.progress.total) * 100;
+    }
+    if (mockMetrics[taskId]) {
+      mockMetrics[taskId].progress = task.progress ?? buildProgress(0, 0, 0);
+      const total = task.progress?.total ?? 0;
+      const done = task.progress?.done ?? 0;
+      const rate = mockMetrics[taskId].partitionsPerMinute ?? 5;
+      const remaining = total - done;
+      mockMetrics[taskId].estimatedMinutesRemaining = remaining / rate;
+      mockMetrics[taskId].estimatedFinishUtc = new Date(Date.now() + (remaining / rate) * 60000).toISOString();
+    }
+  },
+
   deleteTask: async (taskId: string) => {
     await delay(MOCK_DELAY_MS);
     const index = mockTasks.findIndex(task => task.taskId === taskId);
@@ -423,6 +451,12 @@ export const api = USE_MOCK
 
       createTask: (payload: TaskCreateRequest) =>
         request(`/tasks`, { method: "POST", body: JSON.stringify(payload) }),
+
+      addTaskRange: (taskId: string, range: TaskRange) =>
+        request(`/tasks/${encodeURIComponent(taskId)}/ranges`, { 
+          method: "POST", 
+          body: JSON.stringify(range) 
+        }),
 
       deleteTask: (taskId: string) =>
         request(`/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" }),

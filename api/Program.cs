@@ -223,7 +223,7 @@ app.MapGet("/api/tasks/{taskId}/status-histogram", async (
             : row.TimeFrom.ToUniversalTime();
 
         var epoch = new DateTimeOffset(utc).ToUnixTimeSeconds();
-        var bucketEpoch = (epoch / effectiveInterval) * effectiveInterval;
+        var bucketEpoch = epoch / effectiveInterval * effectiveInterval;
         var bucketTime = DateTimeOffset.FromUnixTimeSeconds(bucketEpoch).UtcDateTime;
 
         var status = string.IsNullOrWhiteSpace(row.Status)
@@ -392,6 +392,81 @@ app.MapPost("/api/tasks", async (
     await tx.CommitAsync();
 
     return Results.Created($"/api/tasks/{request.TaskId}", new { request.TaskId });
+});
+
+app.MapPost("/api/tasks/{taskId}/ranges", async (
+    string taskId,
+    TaskRangeDto range,
+    AppDbContext db,
+    IOptions<PartitioningOptions> partitionOptions) =>
+{
+    var task = await db.Tasks.FirstOrDefaultAsync(t => t.TaskId == taskId);
+    if (task == null)
+    {
+        return Results.NotFound();
+    }
+
+    if (range.TimeFrom >= range.TimeTo)
+    {
+        return Results.BadRequest(new { error = "TimeFrom must be before TimeTo" });
+    }
+
+    var partitionSizeSeconds = task.PartitionSizeSeconds;
+    var options = partitionOptions.Value;
+    var todoStatus = string.IsNullOrWhiteSpace(options.PartitionStatusTodo)
+        ? "TODO"
+        : options.PartitionStatusTodo.Trim();
+
+    var rangeEntity = new TaskTimeRange
+    {
+        TaskId = taskId,
+        TimeFrom = range.TimeFrom,
+        TimeTo = range.TimeTo
+    };
+
+    await using var tx = await db.Database.BeginTransactionAsync();
+
+    db.TaskTimeRanges.Add(rangeEntity);
+    await db.SaveChangesAsync();
+
+    var cursor = range.TimeFrom;
+    var batch = new List<TaskPartition>(2000);
+
+    while (cursor < range.TimeTo)
+    {
+        var next = cursor.AddSeconds(partitionSizeSeconds);
+        if (next > range.TimeTo)
+        {
+            next = range.TimeTo;
+        }
+
+        batch.Add(new TaskPartition
+        {
+            TaskId = taskId,
+            TimeFrom = cursor,
+            TimeTo = next,
+            Status = todoStatus
+        });
+
+        if (batch.Count >= 2000)
+        {
+            db.TaskPartitions.AddRange(batch);
+            await db.SaveChangesAsync();
+            batch.Clear();
+        }
+
+        cursor = next;
+    }
+
+    if (batch.Count > 0)
+    {
+        db.TaskPartitions.AddRange(batch);
+        await db.SaveChangesAsync();
+    }
+
+    await tx.CommitAsync();
+
+    return Results.Created($"/api/tasks/{taskId}/ranges", range);
 });
 
 app.MapDelete("/api/tasks/{taskId}", async (string taskId, AppDbContext db) =>

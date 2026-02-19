@@ -1,4 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { api } from "./api";
 import type {
   TaskCreateRequest,
@@ -119,6 +121,10 @@ export default function App() {
   const [partitionSizeSeconds, setPartitionSizeSeconds] = useState<number>(300);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isAddRangeOpen, setIsAddRangeOpen] = useState(false);
+  const [addRangeFrom, setAddRangeFrom] = useState("");
+  const [addRangeTo, setAddRangeTo] = useState("");
+  const [isAddingRange, setIsAddingRange] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isDeletingTask, setIsDeletingTask] = useState(false);
   const [isClearingPartitions, setIsClearingPartitions] = useState(false);
@@ -388,6 +394,37 @@ export default function App() {
     }
   };
 
+  const onOpenAddRange = () => {
+    setAddRangeFrom("");
+    setAddRangeTo("");
+    setIsAddRangeOpen(true);
+  };
+
+  const onAddRange = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedTaskId || !addRangeFrom || !addRangeTo) {
+      return;
+    }
+    setIsAddingRange(true);
+    try {
+      const range: TaskRange = {
+        timeFrom: new Date(addRangeFrom).toISOString(),
+        timeTo: new Date(addRangeTo).toISOString()
+      };
+      await api.addTaskRange(selectedTaskId, range);
+      const ranges = await api.getTaskRanges(selectedTaskId);
+      setSelectedRanges(ranges);
+      setActionNote("טווח נוסף.");
+      setTimeout(() => setActionNote(null), 1800);
+      setIsAddRangeOpen(false);
+      fetchTasks();
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsAddingRange(false);
+    }
+  };
+
   const onHistogramZoom = async (from: Date, to: Date) => {
     if (!selectedTaskId) return;
     
@@ -617,6 +654,7 @@ export default function App() {
                 onDeleteTask={onDeleteTask}
                 onClearPartitions={onClearPartitions}
                 onDeleteRange={onDeleteRange}
+                onAddRange={onOpenAddRange}
                 onHistogramZoom={onHistogramZoom}
                 isDeletingTask={isDeletingTask}
                 isClearingPartitions={isClearingPartitions}
@@ -626,6 +664,61 @@ export default function App() {
                 rangeDoneMode={rangeDoneMode}
                 actionNote={actionNote}
               />
+            </div>
+          </div>
+        )}
+
+        {isAddRangeOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
+            onClick={() => setIsAddRangeOpen(false)}
+          >
+            <div
+              className="glass max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl p-6"
+              onClick={event => event.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">הוספת טווח</div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddRangeOpen(false)}
+                  className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
+                >
+                  סגור
+                </button>
+              </div>
+
+              <form className="space-y-3" onSubmit={onAddRange}>
+                <DatePicker
+                  selected={addRangeFrom ? new Date(addRangeFrom) : null}
+                  onChange={(date: Date | null) => setAddRangeFrom(date ? date.toISOString().slice(0, 16) : "")}
+                  showTimeSelect
+                  timeIntervals={5}
+                  timeFormat="HH:mm"
+                  dateFormat="yyyy-MM-dd HH:mm"
+                  className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                  placeholderText="זמן התחלה"
+                  required
+                />
+                <DatePicker
+                  selected={addRangeTo ? new Date(addRangeTo) : null}
+                  onChange={(date: Date | null) => setAddRangeTo(date ? date.toISOString().slice(0, 16) : "")}
+                  showTimeSelect
+                  timeIntervals={5}
+                  timeFormat="HH:mm"
+                  dateFormat="yyyy-MM-dd HH:mm"
+                  className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                  placeholderText="זמן סיום"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={isAddingRange}
+                  className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+                >
+                  {isAddingRange ? "מוסיף..." : "הוסף טווח"}
+                </button>
+              </form>
             </div>
           </div>
         )}

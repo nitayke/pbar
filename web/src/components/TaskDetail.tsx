@@ -11,6 +11,7 @@ type Props = {
   onDeleteTask: () => void;
   onClearPartitions: () => void;
   onDeleteRange: (range: TaskRange, mode: string) => void;
+  onAddRange: () => void;
   onHistogramZoom?: (from: Date, to: Date) => void;
   isDeletingTask: boolean;
   isClearingPartitions: boolean;
@@ -30,6 +31,7 @@ export default function TaskDetail({
   onDeleteTask,
   onClearPartitions,
   onDeleteRange,
+  onAddRange,
   onHistogramZoom,
   isDeletingTask,
   isClearingPartitions,
@@ -85,7 +87,16 @@ export default function TaskDetail({
       {actionNote && <div className="mt-4 text-xs text-emerald-200">{actionNote}</div>}
 
       <div className="mt-6">
-        <div className="text-xs uppercase tracking-[0.2em] text-slate-400">טווחים</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs uppercase tracking-[0.2em] text-slate-400">טווחים</div>
+          <button
+            type="button"
+            onClick={onAddRange}
+            className="btn-hover rounded-lg border border-emerald-500/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-200"
+          >
+            הוסף טווח
+          </button>
+        </div>
         <div className="mt-3 space-y-3">
           {ranges.length === 0 && (
             <div className="space-y-2">
