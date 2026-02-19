@@ -1,11 +1,10 @@
-import type { TaskMetrics, TaskProgress, TaskRange, TaskStatusHistogram, TaskSummary } from "../types";
+import type { TaskProgress, TaskRange, TaskStatusHistogram, TaskSummary } from "../types";
 import ProgressBar from "./ProgressBar";
 import StatusHistogramChart from "./StatusHistogramChart";
 
 type Props = {
   task: TaskSummary | null;
   progress: TaskProgress | null;
-  metrics: TaskMetrics | null;
   histogram: TaskStatusHistogram | null;
   ranges: TaskRange[];
   onDeleteTask: () => void;
@@ -16,7 +15,6 @@ type Props = {
 export default function TaskDetail({
   task,
   progress,
-  metrics,
   histogram,
   ranges,
   onDeleteTask,
@@ -33,8 +31,7 @@ export default function TaskDetail({
 
   const typeLabel =
     task.type === "reflow" ? "ריפלו" : task.type === "hermetics" ? "הרמטיות" : "אחר";
-  const effectiveProgress = progress ?? task.progress ?? metrics?.progress;
-  const eta = metrics?.estimatedFinishUtc ? new Date(metrics.estimatedFinishUtc).toLocaleString() : "-";
+  const effectiveProgress = progress ?? task.progress;
 
   return (
     <div className="glass grid-glow rounded-3xl p-6">
@@ -57,14 +54,7 @@ export default function TaskDetail({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-slate-400">זמן סיום משוער</div>
-          <div className="mt-2 text-lg text-white">{eta}</div>
-          <div className="mt-1 text-xs text-slate-400">
-            {metrics?.partitionsPerMinute ? `${metrics.partitionsPerMinute} פרטישנים/דקה` : "קצב לא ידוע"}
-          </div>
-        </div>
+      <div className="mt-6">
         <StatusHistogramChart histogram={histogram} />
       </div>
 

@@ -2,7 +2,6 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import type {
   TaskCreateRequest,
-  TaskMetrics,
   TaskProgress,
   TaskRange,
   TaskStatusHistogram,
@@ -11,6 +10,7 @@ import type {
 import RangeEditor, { type RangeDraft } from "./components/RangeEditor";
 import TaskCard from "./components/TaskCard";
 import TaskDetail from "./components/TaskDetail";
+import Background from "./components/Background";
 
 const buildRequestRanges = (ranges: RangeDraft[]): TaskRange[] =>
   ranges
@@ -58,6 +58,7 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
   }, []);
 
   const allOptions = ["all", ...options.filter(option => option !== "all")];
+  const getOptionLabel = (option: string) => (option === "all" ? "הכל" : option);
 
   return (
     <div ref={rootRef} className="relative">
@@ -67,7 +68,7 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
         onClick={() => setOpen(previous => !previous)}
         className="flex w-full items-center justify-between rounded-md border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition hover:border-slate-500 focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
       >
-        <span>{value}</span>
+        <span>{getOptionLabel(value)}</span>
         <span className="text-slate-400">▾</span>
       </button>
 
@@ -87,7 +88,7 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
                   : "text-slate-200 hover:bg-slate-800/80"
               }`}
             >
-              {option}
+              {getOptionLabel(option)}
             </button>
           ))}
         </div>
@@ -107,7 +108,6 @@ export default function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedRanges, setSelectedRanges] = useState<TaskRange[]>([]);
   const [selectedProgress, setSelectedProgress] = useState<TaskProgress | null>(null);
-  const [selectedMetrics, setSelectedMetrics] = useState<TaskMetrics | null>(null);
   const [selectedHistogram, setSelectedHistogram] = useState<TaskStatusHistogram | null>(null);
 
   const [newTaskId, setNewTaskId] = useState("");
@@ -117,6 +117,7 @@ export default function App() {
   const [newRanges, setNewRanges] = useState<RangeDraft[]>([]);
   const [partitionSizeSeconds, setPartitionSizeSeconds] = useState<number>(300);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedTask = useMemo(
@@ -181,7 +182,7 @@ export default function App() {
       const data = await api.getTasks({
         type: filterType === "all" ? undefined : filterType,
         search,
-        includeProgress: true,
+        includeProgress: false,
         take: 200
       });
       setTasks(data);
@@ -202,20 +203,19 @@ export default function App() {
   useEffect(() => {
     if (!selectedTaskId) {
       setSelectedHistogram(null);
+      setIsDetailOpen(false);
       return;
     }
 
     const fetchDetail = async () => {
       try {
-        const [ranges, progress, metrics, histogram] = await Promise.all([
+        const [ranges, progress, histogram] = await Promise.all([
           api.getTaskRanges(selectedTaskId),
           api.getProgress(selectedTaskId),
-          api.getMetrics(selectedTaskId),
           api.getStatusHistogram(selectedTaskId, selectedTask?.partitionSizeSeconds)
         ]);
         setSelectedRanges(ranges);
         setSelectedProgress(progress);
-        setSelectedMetrics(metrics);
         setSelectedHistogram(histogram);
       } catch (error) {
         setMessage((error as Error).message);
@@ -279,7 +279,20 @@ export default function App() {
     setSelectedTaskId(null);
     setSelectedRanges([]);
     setSelectedHistogram(null);
+    setIsDetailOpen(false);
     fetchTasks();
+  };
+
+  const onOpenDetail = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setIsDetailOpen(true);
+  };
+
+  const onCloseDetail = () => {
+    setIsDetailOpen(false);
+    setSelectedTaskId(null);
+    setSelectedRanges([]);
+    setSelectedHistogram(null);
   };
 
   const onClearPartitions = async () => {
@@ -301,8 +314,13 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen overflow-hidden px-6 py-6 text-right text-white" dir="rtl">
-      <header className="mb-4 flex items-start justify-between gap-4">
+    <div className="relative h-screen overflow-hidden px-6 py-6 text-right text-white" dir="rtl">
+      <div className="absolute inset-0 z-0">
+        <Background />
+        <div className="absolute inset-0 bg-slate-950/50" />
+      </div>
+      <div className="relative z-10">
+        <header className="mb-4 flex items-start justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-[0.6em] text-slate-400">בקרת משימות</div>
           <h1 className="mt-2 font-display text-4xl text-white">סרגל פרטישנים</h1>
@@ -317,18 +335,17 @@ export default function App() {
         >
           יצירת משימה
         </button>
-      </header>
+        </header>
 
-      <div className="grid h-[calc(100vh-124px)] gap-5 xl:grid-cols-[420px,1fr]">
-        <aside className="flex min-h-0 flex-col gap-4">
-          <div className="glass relative z-20 rounded-3xl p-6">
+        <div className="grid h-[calc(100vh-124px)] gap-4 lg:grid-cols-[360px,1fr]">
+          <div className="glass relative z-20 rounded-3xl p-4">
             <div className="text-xs uppercase tracking-[0.3em] text-slate-400">סינון</div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 space-y-2">
               <input
                 value={search}
                 onChange={event => setSearch(event.target.value)}
                 placeholder="חיפוש לפי מזהה"
-                className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
               />
               <div className="flex flex-wrap gap-2">
                 {[
@@ -341,7 +358,7 @@ export default function App() {
                     key={type.value}
                     type="button"
                     onClick={() => setFilterType(type.value)}
-                    className={`rounded-full px-3 py-1 text-xs uppercase tracking-[0.2em] ${
+                    className={`rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em] ${
                       filterType === type.value
                         ? "bg-white text-slate-900"
                         : "border border-slate-600 text-slate-200"
@@ -380,13 +397,12 @@ export default function App() {
                   min={2}
                   value={pollSeconds}
                   onChange={event => setPollSeconds(Number(event.target.value))}
-                  className="w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                  className="w-20 rounded-lg border border-slate-700 bg-slate-900/70 px-2 py-1 text-sm"
                 />
               </div>
             </div>
             {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
           </div>
-
           <div className="glass relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl p-4">
             <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
               <span>משימות</span>
@@ -398,7 +414,7 @@ export default function App() {
                   key={task.taskId}
                   task={task}
                   selected={task.taskId === selectedTaskId}
-                  onSelect={setSelectedTaskId}
+                  onSelect={onOpenDetail}
                 />
               ))}
               {filteredTasks.length === 0 && (
@@ -408,24 +424,10 @@ export default function App() {
               )}
             </div>
           </div>
-        </aside>
-
-        <main className="min-h-0 overflow-y-auto pe-1">
-          <TaskDetail
-            task={selectedTask}
-            progress={selectedProgress}
-            metrics={selectedMetrics}
-            histogram={selectedHistogram}
-            ranges={selectedRanges}
-            onDeleteTask={onDeleteTask}
-            onClearPartitions={onClearPartitions}
-            onDeleteRange={onDeleteRange}
-          />
-        </main>
       </div>
 
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
+        {isCreateOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
           <div className="glass max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6">
             <div className="mb-4 flex items-center justify-between">
               <div className="text-xs uppercase tracking-[0.3em] text-slate-400">יצירת משימה</div>
@@ -484,8 +486,35 @@ export default function App() {
             </form>
             {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
           </div>
-        </div>
-      )}
+          </div>
+        )}
+
+        {isDetailOpen && selectedTask && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
+            <div className="glass max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">פרטי משימה</div>
+                <button
+                  type="button"
+                  onClick={onCloseDetail}
+                  className="rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200"
+                >
+                  סגור
+                </button>
+              </div>
+              <TaskDetail
+                task={selectedTask}
+                progress={selectedProgress}
+                histogram={selectedHistogram}
+                ranges={selectedRanges}
+                onDeleteTask={onDeleteTask}
+                onClearPartitions={onClearPartitions}
+                onDeleteRange={onDeleteRange}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
