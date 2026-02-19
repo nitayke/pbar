@@ -10,7 +10,6 @@ import type {
 import RangeEditor, { type RangeDraft } from "./components/RangeEditor";
 import TaskCard from "./components/TaskCard";
 import TaskDetail from "./components/TaskDetail";
-import Background from "./components/Background";
 
 const buildRequestRanges = (ranges: RangeDraft[]): TaskRange[] =>
   ranges
@@ -66,7 +65,7 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
       <button
         type="button"
         onClick={() => setOpen(previous => !previous)}
-        className="flex w-full items-center justify-between rounded-md border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition hover:border-slate-500 focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
+        className="btn-hover flex w-full items-center justify-between rounded-md border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
       >
         <span>{getOptionLabel(value)}</span>
         <span className="text-slate-400">▾</span>
@@ -82,7 +81,7 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
                 onChange(option);
                 setOpen(false);
               }}
-              className={`mb-1 w-full rounded-lg px-3 py-2 text-right text-sm transition last:mb-0 ${
+              className={`btn-hover mb-1 w-full rounded-lg px-3 py-2 text-right text-sm transition last:mb-0 ${
                 value === option
                   ? "bg-cyan-500/20 text-cyan-100"
                   : "text-slate-200 hover:bg-slate-800/80"
@@ -315,10 +314,6 @@ export default function App() {
 
   return (
     <div className="relative h-screen overflow-hidden px-6 py-6 text-right text-white" dir="rtl">
-      <div className="absolute inset-0 z-0">
-        <Background />
-        <div className="absolute inset-0 bg-slate-950/50" />
-      </div>
       <div className="relative z-10">
         <header className="mb-4 flex items-start justify-between gap-4">
         <div>
@@ -331,7 +326,7 @@ export default function App() {
             setMessage(null);
             setIsCreateOpen(true);
           }}
-          className="rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+          className="btn-hover rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
         >
           יצירת משימה
         </button>
@@ -361,7 +356,7 @@ export default function App() {
                     className={`rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em] ${
                       filterType === type.value
                         ? "bg-white text-slate-900"
-                        : "border border-slate-600 text-slate-200"
+                        : "btn-hover border border-slate-600 text-slate-200"
                     }`}
                   >
                     {type.label}
@@ -434,7 +429,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(false)}
-                className="rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200"
+                className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
               >
                 סגור
               </button>
@@ -497,7 +492,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={onCloseDetail}
-                  className="rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200"
+                  className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
                 >
                   סגור
                 </button>

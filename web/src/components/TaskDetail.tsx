@@ -71,21 +71,21 @@ export default function TaskDetail({
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "partitions")}
-                  className="rounded-lg border border-amber-400/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-amber-100"
+                  className="btn-hover rounded-lg border border-amber-400/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-amber-100"
                 >
                   מחק פרטישנים
                 </button>
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "range")}
-                  className="rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200"
+                  className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200"
                 >
                   מחק טווח
                 </button>
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "all")}
-                  className="rounded-lg border border-rose-500/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-rose-200"
+                  className="btn-hover rounded-lg border border-rose-500/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-rose-200"
                 >
                   מחק הכל
                 </button>
@@ -99,14 +99,14 @@ export default function TaskDetail({
         <button
           type="button"
           onClick={onClearPartitions}
-          className="rounded-xl border border-amber-400/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-amber-100"
+          className="btn-hover rounded-xl border border-amber-400/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-amber-100"
         >
           נקה פרטישנים
         </button>
         <button
           type="button"
           onClick={onDeleteTask}
-          className="rounded-xl border border-rose-500/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
+          className="btn-hover rounded-xl border border-rose-500/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
         >
           מחק משימה
         </button>

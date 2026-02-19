@@ -15,7 +15,7 @@ export default function TaskCard({ task, selected, onSelect }: Props) {
     <button
       type="button"
       onClick={() => onSelect(task.taskId)}
-      className={`w-full rounded-2xl border p-4 text-right transition ${
+      className={`btn-hover w-full rounded-2xl border p-4 text-right transition ${
         selected
           ? "border-emerald-400/70 bg-emerald-500/10"
           : "border-slate-700/80 bg-slate-900/70 hover:border-slate-500"
