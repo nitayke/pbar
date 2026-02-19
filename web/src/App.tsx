@@ -388,6 +388,25 @@ export default function App() {
     }
   };
 
+  const onHistogramZoom = async (from: Date, to: Date) => {
+    if (!selectedTaskId) return;
+    
+    setIsHistogramLoading(true);
+    try {
+      const histogram = await api.getStatusHistogram(
+        selectedTaskId,
+        undefined,
+        from,
+        to
+      );
+      setSelectedHistogram(histogram);
+    } catch (error) {
+      setMessage((error as Error).message);
+    } finally {
+      setIsHistogramLoading(false);
+    }
+  };
+
   return (
     <div className="relative h-screen overflow-hidden px-6 py-6 text-right text-white" dir="rtl">
       <div className="relative z-10">
@@ -598,6 +617,7 @@ export default function App() {
                 onDeleteTask={onDeleteTask}
                 onClearPartitions={onClearPartitions}
                 onDeleteRange={onDeleteRange}
+                onHistogramZoom={onHistogramZoom}
                 isDeletingTask={isDeletingTask}
                 isClearingPartitions={isClearingPartitions}
                 deletingRangeKey={deletingRangeKey}

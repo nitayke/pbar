@@ -164,10 +164,38 @@ const mockMetrics: Record<string, TaskMetrics> = {
   }
 };
 
-const buildMockStatusHistogram = (taskId: string, intervalSeconds = 300): TaskStatusHistogram => {
+const buildMockStatusHistogram = (
+  taskId: string, 
+  intervalSeconds?: number,
+  from?: Date,
+  to?: Date
+): TaskStatusHistogram => {
   const task = mockTasks.find(entry => entry.taskId === taskId);
   const progress = task?.progress ?? buildProgress(0, 0, 0);
-  const bucketCount = 12;
+  
+  let effectiveInterval: number;
+  if (intervalSeconds !== undefined) {
+    effectiveInterval = Math.max(1, Math.min(intervalSeconds, 86400));
+  } else if (from && to) {
+    const span = to.getTime() - from.getTime();
+    const days = span / (1000 * 60 * 60 * 24);
+    if (days <= 1)
+      effectiveInterval = 300;      // 5 minutes
+    else if (days <= 7)
+      effectiveInterval = 1800;     // 30 minutes
+    else if (days <= 30)
+      effectiveInterval = 3600;     // 1 hour
+    else
+      effectiveInterval = 14400;    // 4 hours
+  } else {
+    effectiveInterval = task?.partitionSizeSeconds ?? 3600;
+  }
+
+  const now = Date.now();
+  const endTime = to ? to.getTime() : now;
+  const startTime = from ? from.getTime() : now - (12 * effectiveInterval * 1000);
+  
+  const bucketCount = Math.ceil((endTime - startTime) / (effectiveInterval * 1000));
 
   const buckets = Array.from({ length: bucketCount }, (_, index) => {
     const ratio = (index + 1) / bucketCount;
@@ -182,13 +210,13 @@ const buildMockStatusHistogram = (taskId: string, intervalSeconds = 300): TaskSt
     ].filter(item => item.count > 0);
 
     return {
-      timestampUtc: new Date(Date.now() - (bucketCount - index) * intervalSeconds * 1000).toISOString(),
+      timestampUtc: new Date(startTime + index * effectiveInterval * 1000).toISOString(),
       statuses
     };
   });
 
   return {
-    intervalSeconds,
+    intervalSeconds: effectiveInterval,
     buckets
   };
 };
@@ -273,10 +301,10 @@ const mockApi = {
     };
   },
 
-  getStatusHistogram: async (taskId: string, intervalSeconds?: number) => {
+  getStatusHistogram: async (taskId: string, intervalSeconds?: number, from?: Date, to?: Date) => {
     await delay(MOCK_DELAY_MS);
     advanceTask(taskId);
-    return buildMockStatusHistogram(taskId, intervalSeconds ?? 300);
+    return buildMockStatusHistogram(taskId, intervalSeconds, from, to);
   },
 
   createTask: async (payload: TaskCreateRequest) => {
@@ -376,9 +404,13 @@ export const api = USE_MOCK
       getMetrics: (taskId: string) =>
         request<TaskMetrics>(`/tasks/${encodeURIComponent(taskId)}/metrics`),
 
-      getStatusHistogram: (taskId: string, intervalSeconds?: number) =>
+      getStatusHistogram: (taskId: string, intervalSeconds?: number, from?: Date, to?: Date) =>
         request<TaskStatusHistogram>(
-          `/tasks/${encodeURIComponent(taskId)}/status-histogram${buildQuery({ intervalSeconds })}`
+          `/tasks/${encodeURIComponent(taskId)}/status-histogram${buildQuery({ 
+            intervalSeconds, 
+            from: from?.toISOString(), 
+            to: to?.toISOString() 
+          })}`
         ),
 
       createTask: (payload: TaskCreateRequest) =>

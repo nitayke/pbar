@@ -11,6 +11,7 @@ type Props = {
   onDeleteTask: () => void;
   onClearPartitions: () => void;
   onDeleteRange: (range: TaskRange, mode: string) => void;
+  onHistogramZoom?: (from: Date, to: Date) => void;
   isDeletingTask: boolean;
   isClearingPartitions: boolean;
   deletingRangeKey: string | null;
@@ -29,6 +30,7 @@ export default function TaskDetail({
   onDeleteTask,
   onClearPartitions,
   onDeleteRange,
+  onHistogramZoom,
   isDeletingTask,
   isClearingPartitions,
   deletingRangeKey,
@@ -71,7 +73,13 @@ export default function TaskDetail({
       </div>
 
       <div className="mt-6">
-        <StatusHistogramChart histogram={histogram} isLoading={isHistogramLoading} />
+        <StatusHistogramChart 
+          histogram={histogram} 
+          isLoading={isHistogramLoading}
+          taskId={task.taskId}
+          partitionSizeSeconds={task.partitionSizeSeconds}
+          onZoomRange={onHistogramZoom}
+        />
       </div>
 
       {actionNote && <div className="mt-4 text-xs text-emerald-200">{actionNote}</div>}

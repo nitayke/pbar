@@ -174,7 +174,27 @@ app.MapGet("/api/tasks/{taskId}/status-histogram", async (
         return Results.NotFound();
     }
 
-    var effectiveInterval = Math.Clamp(intervalSeconds ?? task.PartitionSizeSeconds ?? 300, 1, 86400);
+    int effectiveInterval;
+    if (intervalSeconds.HasValue)
+    {
+        effectiveInterval = Math.Clamp(intervalSeconds.Value, 1, 86400);
+    }
+    else if (from.HasValue && to.HasValue)
+    {
+        var span = to.Value - from.Value;
+        if (span.TotalDays <= 1)
+            effectiveInterval = 300;      // 5 minutes
+        else if (span.TotalDays <= 7)
+            effectiveInterval = 1800;     // 30 minutes
+        else if (span.TotalDays <= 30)
+            effectiveInterval = 3600;     // 1 hour
+        else
+            effectiveInterval = 14400;    // 4 hours
+    }
+    else
+    {
+        effectiveInterval = task.PartitionSizeSeconds ?? 3600;
+    }
 
     var query = db.TaskPartitions
         .AsNoTracking()

@@ -1,10 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import ReactECharts from "echarts-for-react";
 import type { TaskStatusHistogram } from "../types";
 
 type Props = {
   histogram: TaskStatusHistogram | null;
   isLoading?: boolean;
+  taskId?: string;
+  partitionSizeSeconds?: number;
+  onZoomRange?: (from: Date, to: Date) => void;
 };
 
 const preferredStatusOrder = ["done", "completed", "complete", "in_progress", "inprogress", "running", "todo"];
@@ -49,7 +52,39 @@ const getStatusLabel = (status: string) => {
   return status;
 };
 
-export default function StatusHistogramChart({ histogram, isLoading }: Props) {
+export default function StatusHistogramChart({ histogram, isLoading, taskId, partitionSizeSeconds, onZoomRange }: Props) {
+  const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const chart = useMemo(() => {
+    if (!histogram || histogram.buckets.length === 0) {
+      return { categories: [], series: [] };
+    }
+
+    const categories = histogram.buckets.map(bucket => new Date(bucket.timestampUtc));
+    const statusSet = new Set<string>();
+    histogram.buckets.forEach(bucket =>
+      bucket.statuses.forEach(statusEntry => statusSet.add(statusEntry.status.toLowerCase()))
+    );
+
+    const statuses = sortStatuses(Array.from(statusSet));
+
+    const series = statuses.map(status => ({
+      name: getStatusLabel(status),
+      rawStatus: status,
+      type: "bar" as const,
+      stack: "total",
+      emphasis: { focus: "series" as const },
+      itemStyle: {
+        color: getStatusColor(status)
+      },
+      data: histogram.buckets.map(bucket =>
+        bucket.statuses.find(entry => entry.status.toLowerCase() === status)?.count ?? 0
+      )
+    }));
+
+    return { categories, series };
+  }, [histogram]);
+
   if (isLoading) {
     return (
       <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
@@ -78,32 +113,6 @@ export default function StatusHistogramChart({ histogram, isLoading }: Props) {
     );
   }
 
-  const chart = useMemo(() => {
-    const categories = histogram.buckets.map(bucket => new Date(bucket.timestampUtc));
-    const statusSet = new Set<string>();
-    histogram.buckets.forEach(bucket =>
-      bucket.statuses.forEach(statusEntry => statusSet.add(statusEntry.status.toLowerCase()))
-    );
-
-    const statuses = sortStatuses(Array.from(statusSet));
-
-    const series = statuses.map(status => ({
-      name: getStatusLabel(status),
-      rawStatus: status,
-      type: "bar" as const,
-      stack: "total",
-      emphasis: { focus: "series" as const },
-      itemStyle: {
-        color: getStatusColor(status)
-      },
-      data: histogram.buckets.map(bucket =>
-        bucket.statuses.find(entry => entry.status.toLowerCase() === status)?.count ?? 0
-      )
-    }));
-
-    return { categories, series };
-  }, [histogram]);
-
   return (
     <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4" dir="ltr">
       <div className="flex items-center justify-between gap-3">
@@ -113,6 +122,42 @@ export default function StatusHistogramChart({ histogram, isLoading }: Props) {
 
       <div className="mt-4 rounded-xl border border-slate-700/70 bg-slate-950/60 p-2" dir="ltr">
         <ReactECharts
+          onEvents={{
+            dataZoom: (params: any) => {
+              if (!onZoomRange || !chart.categories.length) return;
+              
+              // Clear previous timeout
+              if (zoomTimeoutRef.current) {
+                clearTimeout(zoomTimeoutRef.current);
+              }
+              
+              // Debounce zoom events
+              zoomTimeoutRef.current = setTimeout(() => {
+                const batch = params.batch?.[0] || params;
+                let startValue = batch.startValue ?? batch.start;
+                let endValue = batch.endValue ?? batch.end;
+                
+                // If we have percentage values, convert to timestamp
+                if (startValue !== undefined && endValue !== undefined) {
+                  if (startValue <= 100 && endValue <= 100) {
+                    // These are percentages, convert to indices
+                    const startIndex = Math.floor((startValue / 100) * chart.categories.length);
+                    const endIndex = Math.ceil((endValue / 100) * chart.categories.length);
+                    const from = chart.categories[Math.max(0, startIndex)];
+                    const to = chart.categories[Math.min(chart.categories.length - 1, endIndex)];
+                    if (from && to) {
+                      onZoomRange(from, to);
+                    }
+                  } else {
+                    // These are timestamps
+                    const from = new Date(startValue);
+                    const to = new Date(endValue);
+                    onZoomRange(from, to);
+                  }
+                }
+              }, 500); // Wait 500ms after user stops zooming
+            }
+          }}
           option={{
             backgroundColor: "transparent",
             textStyle: { color: "#e2e8f0", fontFamily: "Heebo" },
