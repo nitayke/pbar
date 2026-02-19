@@ -281,7 +281,15 @@ const mockApi = {
     }
     const start = Math.max(0, params.skip ?? 0);
     const end = start + Math.min(params.take ?? 200, 500);
-    return items.slice(start, end);
+    
+    const results = items.slice(start, end);
+    
+    // Don't include progress if not requested
+    if (params.includeProgress !== true) {
+      return results.map(({ progress, ...task }) => task);
+    }
+    
+    return results;
   },
 
   getTaskRanges: async (taskId: string) => mockRanges[taskId] ?? [],

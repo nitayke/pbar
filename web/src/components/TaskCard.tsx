@@ -1,5 +1,4 @@
 import type { TaskSummary } from "../types";
-import ProgressBar from "./ProgressBar";
 
 type Props = {
   task: TaskSummary;
@@ -31,9 +30,6 @@ export default function TaskCard({ task, selected, onSelect }: Props) {
         <div className="text-xs text-slate-400">{new Date(task.lastUpdate).toLocaleString()}</div>
       </div>
       <p className="task-description mt-2 max-h-16 overflow-y-auto pr-1 text-sm text-slate-300">{task.description || "ללא תיאור"}</p>
-      <div className="mt-3">
-        <ProgressBar progress={task.progress} />
-      </div>
       <div className="mt-2 text-xs text-slate-400">נוצר על ידי: {task.createdBy || "-"}</div>
       <div className="mt-1 text-xs text-slate-400">גודל חלוקה: {task.partitionSizeSeconds ?? "-"} שניות</div>
     </button>
