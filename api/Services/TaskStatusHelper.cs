@@ -1,4 +1,5 @@
 using Pbar.Api.Contracts;
+using Pbar.Api.Repositories;
 
 namespace Pbar.Api.Services;
 
@@ -7,42 +8,31 @@ public static class TaskStatusHelper
     private static readonly string[] DoneStatuses = { "done", "complete", "completed" };
     private static readonly string[] InProgressStatuses = { "in_progress", "inprogress", "running" };
 
-    public static TaskProgressDto BuildProgress(IEnumerable<dynamic> counts)
+    public static TaskProgressDto BuildProgress(IEnumerable<StatusCount> counts)
     {
         var progress = new TaskProgressDto();
         foreach (var item in counts)
         {
-            var status = ((string?)item.Status) ?? string.Empty;
-            var count = (long)item.Count;
-            ApplyCount(progress, status, count);
+            ApplyCount(progress, item.Status, item.Count);
         }
 
         FinalizePercentages(progress);
         return progress;
     }
 
-    public static Dictionary<string, TaskProgressDto> BuildProgressMap(IEnumerable<dynamic> counts)
+    public static Dictionary<string, TaskProgressDto> BuildProgressMap(Dictionary<string, List<StatusCount>> countsMap)
     {
         var map = new Dictionary<string, TaskProgressDto>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var item in counts)
+        foreach (var (taskId, counts) in countsMap)
         {
-            var taskId = (string)item.TaskId;
-            var status = ((string?)item.Status) ?? string.Empty;
-            var count = (long)item.Count;
-
-            if (!map.TryGetValue(taskId, out var progress))
+            var progress = new TaskProgressDto();
+            foreach (var item in counts)
             {
-                progress = new TaskProgressDto();
-                map[taskId] = progress;
+                ApplyCount(progress, item.Status, item.Count);
             }
-
-            ApplyCount(progress, status, count);
-        }
-
-        foreach (var progress in map.Values)
-        {
             FinalizePercentages(progress);
+            map[taskId] = progress;
         }
 
         return map;

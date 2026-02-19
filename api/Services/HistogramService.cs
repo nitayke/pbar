@@ -1,0 +1,89 @@
+using Pbar.Api.Contracts;
+using Pbar.Api.Repositories;
+using Pbar.Api.Services.Interfaces;
+
+namespace Pbar.Api.Services;
+
+public sealed class HistogramService : IHistogramService
+{
+    private readonly IUnitOfWork _uow;
+
+    public HistogramService(IUnitOfWork uow)
+    {
+        _uow = uow;
+    }
+
+    public async Task<TaskStatusHistogramDto?> GetHistogramAsync(
+        string taskId, int? intervalSeconds, DateTime? from, DateTime? to)
+    {
+        var task = await _uow.Tasks.GetByIdAsync(taskId);
+        if (task is null) return null;
+
+        var effectiveInterval = CalculateInterval(intervalSeconds, from, to, task.PartitionSizeSeconds);
+
+        var rows = await _uow.Partitions.GetHistogramRowsAsync(taskId, from, to);
+
+        var buckets = new Dictionary<DateTime, Dictionary<string, long>>();
+
+        foreach (var row in rows)
+        {
+            var utc = row.TimeFrom.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(row.TimeFrom, DateTimeKind.Utc)
+                : row.TimeFrom.ToUniversalTime();
+
+            var epoch = new DateTimeOffset(utc).ToUnixTimeSeconds();
+            var bucketEpoch = epoch / effectiveInterval * effectiveInterval;
+            var bucketTime = DateTimeOffset.FromUnixTimeSeconds(bucketEpoch).UtcDateTime;
+
+            var status = string.IsNullOrWhiteSpace(row.Status)
+                ? "unknown"
+                : row.Status.Trim().ToLowerInvariant();
+
+            if (!buckets.TryGetValue(bucketTime, out var statusMap))
+            {
+                statusMap = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                buckets[bucketTime] = statusMap;
+            }
+
+            statusMap.TryGetValue(status, out var current);
+            statusMap[status] = current + 1;
+        }
+
+        return new TaskStatusHistogramDto
+        {
+            IntervalSeconds = effectiveInterval,
+            Buckets = buckets
+                .OrderBy(e => e.Key)
+                .Select(e => new TaskStatusHistogramBucketDto
+                {
+                    TimestampUtc = e.Key,
+                    Statuses = e.Value
+                        .OrderBy(p => p.Key)
+                        .Select(p => new TaskStatusCountDto
+                        {
+                            Status = p.Key,
+                            Count = p.Value
+                        })
+                        .ToList()
+                })
+                .ToList()
+        };
+    }
+
+    private static int CalculateInterval(int? intervalSeconds, DateTime? from, DateTime? to, int? partitionSizeSeconds)
+    {
+        if (intervalSeconds.HasValue)
+            return Math.Clamp(intervalSeconds.Value, 1, 86400);
+
+        if (from.HasValue && to.HasValue)
+        {
+            var span = to.Value - from.Value;
+            if (span.TotalDays <= 1) return 300;
+            if (span.TotalDays <= 7) return 1800;
+            if (span.TotalDays <= 30) return 3600;
+            return 14400;
+        }
+
+        return partitionSizeSeconds ?? 3600;
+    }
+}

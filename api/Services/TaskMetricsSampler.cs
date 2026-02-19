@@ -2,18 +2,22 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Pbar.Api.Contracts;
 using Pbar.Api.Data;
+using Pbar.Api.Repositories;
 
 namespace Pbar.Api.Services;
 
 public sealed class TaskMetricsSampler : BackgroundService
 {
-    private readonly IServiceProvider _services;
+    private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly TaskMetricsCache _cache;
     private readonly IOptions<MetricsOptions> _options;
 
-    public TaskMetricsSampler(IServiceProvider services, TaskMetricsCache cache, IOptions<MetricsOptions> options)
+    public TaskMetricsSampler(
+        IDbContextFactory<AppDbContext> contextFactory,
+        TaskMetricsCache cache,
+        IOptions<MetricsOptions> options)
     {
-        _services = services;
+        _contextFactory = contextFactory;
         _cache = cache;
         _options = options;
     }
@@ -30,8 +34,7 @@ public sealed class TaskMetricsSampler : BackgroundService
 
     private async Task SampleAsync(CancellationToken stoppingToken)
     {
-        using var scope = _services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        using var db = await _contextFactory.CreateDbContextAsync(stoppingToken);
 
         var lookback = DateTime.UtcNow.AddMinutes(-_options.Value.LookbackMinutes);
         var taskIds = await db.Tasks.AsNoTracking()
@@ -41,26 +44,16 @@ public sealed class TaskMetricsSampler : BackgroundService
             .Select(t => t.TaskId)
             .ToListAsync(stoppingToken);
 
-        if (taskIds.Count == 0)
-        {
-            return;
-        }
+        if (taskIds.Count == 0) return;
 
-        var counts = await db.TaskPartitions.AsNoTracking()
-            .Where(p => taskIds.Contains(p.TaskId))
-            .GroupBy(p => new { p.TaskId, p.Status })
-            .Select(g => new { g.Key.TaskId, g.Key.Status, Count = g.Count() })
-            .ToListAsync(stoppingToken);
-
-        var progressMap = TaskStatusHelper.BuildProgressMap(counts);
+        var partitionRepo = new PartitionRepository(db);
+        var countsMap = await partitionRepo.GetStatusCountsForTasksAsync(taskIds);
+        var progressMap = TaskStatusHelper.BuildProgressMap(countsMap);
         var timestamp = DateTime.UtcNow;
 
         foreach (var taskId in taskIds)
         {
-            if (!progressMap.TryGetValue(taskId, out var progress))
-            {
-                continue;
-            }
+            if (!progressMap.TryGetValue(taskId, out var progress)) continue;
 
             var sample = new TaskMetricSampleDto
             {
