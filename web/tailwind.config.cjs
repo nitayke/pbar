@@ -3,8 +3,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        display: ["Fraunces", "serif"],
-        body: ["Space Grotesk", "sans-serif"]
+        display: ["Heebo", "sans-serif"],
+        body: ["Heebo", "sans-serif"]
       },
       colors: {
         ink: "#0f172a",

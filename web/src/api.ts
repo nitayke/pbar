@@ -64,6 +64,7 @@ const mockTasks: TaskSummary[] = [
     description: "בדיקת ריפלו",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
     createdBy: "dana",
+    partitionSizeSeconds: 300,
     type: "reflow",
     progress: buildProgress(1200, 820, 210)
   },
@@ -72,6 +73,7 @@ const mockTasks: TaskSummary[] = [
     description: "שיפור תהליך",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
     createdBy: "yossi",
+    partitionSizeSeconds: 600,
     type: "hermetics",
     progress: buildProgress(900, 420, 190)
   },
@@ -80,6 +82,7 @@ const mockTasks: TaskSummary[] = [
     description: "תחזוקה",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
     createdBy: "alice",
+    partitionSizeSeconds: 300,
     type: "other",
     progress: buildProgress(300, 120, 30)
   }
@@ -234,11 +237,15 @@ const mockApi = {
     const total = Math.max(1, payload.ranges.length * 120);
     const progress = buildProgress(total, 0, 0);
     const rate = Math.max(3, Math.round(5 + Math.random() * 8));
+    const partitionSizeSeconds = payload.partitionSizeSeconds
+      ?? (payload.partitionMinutes ? payload.partitionMinutes * 60 : undefined)
+      ?? 300;
     const task: TaskSummary = {
       taskId: payload.taskId,
       description: payload.description ?? "",
       lastUpdate: new Date().toISOString(),
       createdBy: payload.createdBy ?? "",
+      partitionSizeSeconds,
       type: payload.taskId.toLowerCase().includes("reflow")
         ? "reflow"
         : payload.taskId.toLowerCase().includes("hermetics")

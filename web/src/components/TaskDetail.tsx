@@ -30,7 +30,7 @@ export default function TaskDetail({
   }
 
   const typeLabel =
-    task.type === "reflow" ? "ריפלו" : task.type === "hermetics" ? "הרמטיקס" : "אחר";
+    task.type === "reflow" ? "ריפלו" : task.type === "hermetics" ? "הרמטיות" : "אחר";
   const effectiveProgress = progress ?? task.progress ?? metrics?.progress;
   const eta = metrics?.estimatedFinishUtc ? new Date(metrics.estimatedFinishUtc).toLocaleString() : "-";
 
@@ -51,6 +51,7 @@ export default function TaskDetail({
           <span>בתהליך: {effectiveProgress?.inProgress ?? 0}</span>
           <span>לביצוע: {effectiveProgress?.todo ?? 0}</span>
           <span>סה"כ: {effectiveProgress?.total ?? 0}</span>
+          <span>גודל חלוקה: {task.partitionSizeSeconds ?? "-"} שניות</span>
         </div>
       </div>
 
@@ -59,7 +60,7 @@ export default function TaskDetail({
           <div className="text-xs uppercase tracking-[0.2em] text-slate-400">זמן סיום משוער</div>
           <div className="mt-2 text-lg text-white">{eta}</div>
           <div className="mt-1 text-xs text-slate-400">
-            {metrics?.partitionsPerMinute ? `${metrics.partitionsPerMinute} חלוקות/דקה` : "קצב לא ידוע"}
+            {metrics?.partitionsPerMinute ? `${metrics.partitionsPerMinute} פרטישנים/דקה` : "קצב לא ידוע"}
           </div>
         </div>
         <VelocityChart samples={metrics?.samples ?? []} />
@@ -80,7 +81,7 @@ export default function TaskDetail({
                   onClick={() => onDeleteRange(range, "partitions")}
                   className="rounded-lg border border-amber-400/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-amber-100"
                 >
-                  מחק חלוקות
+                  מחק פרטישנים
                 </button>
                 <button
                   type="button"
@@ -108,7 +109,7 @@ export default function TaskDetail({
           onClick={onClearPartitions}
           className="rounded-xl border border-amber-400/60 px-4 py-2 text-xs uppercase tracking-[0.2em] text-amber-100"
         >
-          נקה חלוקות
+          נקה פרטישנים
         </button>
         <button
           type="button"

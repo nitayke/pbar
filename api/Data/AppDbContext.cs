@@ -23,6 +23,7 @@ public sealed class AppDbContext : DbContext
             builder.Property(t => t.Description).HasColumnName("DESCRIPTION");
             builder.Property(t => t.LastUpdate).HasColumnName("LAST_UPDATE");
             builder.Property(t => t.CreatedBy).HasColumnName("CREATED_BY");
+            builder.Property(t => t.PartitionSizeSeconds).HasColumnName("PARTITION_SIZE_SECONDS");
         });
 
         modelBuilder.Entity<TaskPartition>(builder =>

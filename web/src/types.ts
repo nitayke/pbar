@@ -13,6 +13,7 @@ export type TaskSummary = {
   description: string;
   lastUpdate: string;
   createdBy: string;
+  partitionSizeSeconds?: number;
   type: "reflow" | "hermetics" | "other";
   progress?: TaskProgress;
 };
@@ -42,4 +43,5 @@ export type TaskCreateRequest = {
   createdBy?: string;
   ranges: TaskRange[];
   partitionMinutes?: number;
+  partitionSizeSeconds?: number;
 };

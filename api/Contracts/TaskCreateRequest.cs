@@ -7,4 +7,5 @@ public sealed class TaskCreateRequest
     public string? CreatedBy { get; set; }
     public List<TaskRangeDto> Ranges { get; set; } = new();
     public int? PartitionMinutes { get; set; }
+    public int? PartitionSizeSeconds { get; set; }
 }

@@ -88,6 +88,7 @@ app.MapGet("/api/tasks", async (
             Description = task.Description,
             LastUpdate = task.LastUpdate,
             CreatedBy = task.CreatedBy,
+            PartitionSizeSeconds = task.PartitionSizeSeconds,
             Type = TaskTypeHelper.GetType(task.TaskId)
         })
         .ToListAsync();
@@ -222,11 +223,16 @@ app.MapPost("/api/tasks", async (
     }
 
     var options = partitionOptions.Value;
-    var partitionMinutes = request.PartitionMinutes ?? options.PartitionMinutes;
-    if (partitionMinutes <= 0)
+    var partitionSizeSeconds = request.PartitionSizeSeconds
+        ?? (request.PartitionMinutes.HasValue ? request.PartitionMinutes.Value * 60 : (int?)null)
+        ?? options.PartitionMinutes * 60;
+
+    if (partitionSizeSeconds <= 0)
     {
-        return Results.BadRequest("PartitionMinutes must be greater than zero.");
+        return Results.BadRequest("PartitionSizeSeconds must be greater than zero.");
     }
+
+    task.PartitionSizeSeconds = partitionSizeSeconds;
 
     var todoStatus = string.IsNullOrWhiteSpace(options.PartitionStatusTodo)
         ? "TODO"
@@ -245,7 +251,7 @@ app.MapPost("/api/tasks", async (
 
         while (cursor < range.TimeTo)
         {
-            var next = cursor.AddMinutes(partitionMinutes);
+            var next = cursor.AddSeconds(partitionSizeSeconds);
             if (next > range.TimeTo)
             {
                 next = range.TimeTo;

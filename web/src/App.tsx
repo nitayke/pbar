@@ -28,7 +28,7 @@ export default function App() {
   const [newCreatedBy, setNewCreatedBy] = useState("");
   const [userOptions, setUserOptions] = useState<string[]>([]);
   const [newRanges, setNewRanges] = useState<RangeDraft[]>([]);
-  const [partitionMinutes, setPartitionMinutes] = useState<number>(5);
+  const [partitionSizeSeconds, setPartitionSizeSeconds] = useState<number>(300);
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedTask = useMemo(
@@ -111,7 +111,7 @@ export default function App() {
       description: newDescription,
       createdBy: newCreatedBy,
       ranges: buildRequestRanges(newRanges),
-      partitionMinutes
+      partitionSizeSeconds
     };
 
     try {
@@ -159,7 +159,7 @@ export default function App() {
     <div className="min-h-screen px-6 py-10 text-right text-white" dir="rtl">
       <header className="mb-8">
         <div className="text-xs uppercase tracking-[0.6em] text-slate-400">בקרת משימות</div>
-        <h1 className="mt-2 font-display text-4xl text-white">סרגל חלוקות</h1>
+        <h1 className="mt-2 font-display text-4xl text-white">סרגל פרטישנים</h1>
       </header>
 
       <div className="grid gap-6 xl:grid-cols-[360px,1fr]">
@@ -193,12 +193,12 @@ export default function App() {
                 ))}
               </datalist>
               <div className="flex items-center gap-3">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">דקות חלוקה</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">שניות חלוקה</label>
                 <input
                   type="number"
                   min={1}
-                  value={partitionMinutes}
-                  onChange={event => setPartitionMinutes(Number(event.target.value))}
+                  value={partitionSizeSeconds}
+                  onChange={event => setPartitionSizeSeconds(Number(event.target.value))}
                   className="w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
                 />
               </div>
@@ -226,7 +226,7 @@ export default function App() {
                 {[
                   { value: "all", label: "הכל" },
                   { value: "reflow", label: "ריפלו" },
-                  { value: "hermetics", label: "הרמטיקס" },
+                  { value: "hermetics", label: "הרמטיות" },
                   { value: "other", label: "אחר" }
                 ].map(type => (
                   <button

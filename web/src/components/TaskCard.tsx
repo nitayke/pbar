@@ -9,7 +9,7 @@ type Props = {
 
 export default function TaskCard({ task, selected, onSelect }: Props) {
   const typeLabel =
-    task.type === "reflow" ? "ריפלו" : task.type === "hermetics" ? "הרמטיקס" : "אחר";
+    task.type === "reflow" ? "ריפלו" : task.type === "hermetics" ? "הרמטיות" : "אחר";
 
   return (
     <button
@@ -35,6 +35,7 @@ export default function TaskCard({ task, selected, onSelect }: Props) {
         <ProgressBar progress={task.progress} />
       </div>
       <div className="mt-2 text-xs text-slate-400">נוצר על ידי: {task.createdBy || "-"}</div>
+      <div className="mt-1 text-xs text-slate-400">גודל חלוקה: {task.partitionSizeSeconds ?? "-"} שניות</div>
     </button>
   );
 }
