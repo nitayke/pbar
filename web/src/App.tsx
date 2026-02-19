@@ -109,6 +109,7 @@ export default function App() {
   const [selectedRanges, setSelectedRanges] = useState<TaskRange[]>([]);
   const [selectedProgress, setSelectedProgress] = useState<TaskProgress | null>(null);
   const [selectedHistogram, setSelectedHistogram] = useState<TaskStatusHistogram | null>(null);
+  const [isHistogramLoading, setIsHistogramLoading] = useState(false);
 
   const [newTaskId, setNewTaskId] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -123,6 +124,9 @@ export default function App() {
   const [isClearingPartitions, setIsClearingPartitions] = useState(false);
   const [deletingRangeKey, setDeletingRangeKey] = useState<string | null>(null);
   const [deletingRangeMode, setDeletingRangeMode] = useState<string | null>(null);
+  const [rangeDoneKey, setRangeDoneKey] = useState<string | null>(null);
+  const [rangeDoneMode, setRangeDoneMode] = useState<string | null>(null);
+  const [actionNote, setActionNote] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedTask = useMemo(
@@ -208,11 +212,13 @@ export default function App() {
   useEffect(() => {
     if (!selectedTaskId) {
       setSelectedHistogram(null);
+      setIsHistogramLoading(false);
       setIsDetailOpen(false);
       return;
     }
 
     const fetchDetail = async () => {
+      setIsHistogramLoading(true);
       try {
         const [ranges, progress, histogram] = await Promise.all([
           api.getTaskRanges(selectedTaskId),
@@ -224,6 +230,8 @@ export default function App() {
         setSelectedHistogram(histogram);
       } catch (error) {
         setMessage((error as Error).message);
+      } finally {
+        setIsHistogramLoading(false);
       }
     };
 
@@ -249,6 +257,38 @@ export default function App() {
 
     return () => clearTimeout(handle);
   }, [newCreatedBy]);
+
+  useEffect(() => {
+    if (!isCreateOpen && !isDetailOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (isCreateOpen) {
+          setIsCreateOpen(false);
+        }
+        if (isDetailOpen) {
+          onCloseDetail();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isCreateOpen, isDetailOpen]);
+
+  const onUserFocus = async () => {
+    if (userOptions.length > 0) {
+      return;
+    }
+    try {
+      const users = await api.getUsers("");
+      setUserOptions(users);
+    } catch {
+      setUserOptions([]);
+    }
+  };
 
   const onCreateTask = async (event: FormEvent) => {
     event.preventDefault();
@@ -286,6 +326,7 @@ export default function App() {
     setIsDeletingTask(true);
     try {
       await api.deleteTask(selectedTaskId);
+      setMessage("משימה נמחקה.");
       setSelectedTaskId(null);
       setSelectedRanges([]);
       setSelectedHistogram(null);
@@ -315,6 +356,8 @@ export default function App() {
     setIsClearingPartitions(true);
     try {
       await api.deletePartitions(selectedTaskId);
+      setActionNote("פרטישנים נוקו.");
+      setTimeout(() => setActionNote(null), 1800);
       fetchTasks();
     } finally {
       setIsClearingPartitions(false);
@@ -332,6 +375,14 @@ export default function App() {
       await api.deleteRange(selectedTaskId, range.timeFrom, range.timeTo, mode);
       const ranges = await api.getTaskRanges(selectedTaskId);
       setSelectedRanges(ranges);
+      setRangeDoneKey(rangeKey);
+      setRangeDoneMode(mode);
+      setActionNote(mode === "partitions" ? "פרטישנים נמחקו." : "טווח נמחק.");
+      setTimeout(() => {
+        setRangeDoneKey(null);
+        setRangeDoneMode(null);
+        setActionNote(null);
+      }, 1800);
       fetchTasks();
     } finally {
       setDeletingRangeKey(null);
@@ -440,8 +491,10 @@ export default function App() {
                 />
               ))}
               {filteredTasks.length === 0 && (
-                <div className="rounded-xl border border-slate-700/70 p-4 text-sm text-slate-300">
-                  אין משימות שמתאימות לפילטרים שנבחרו.
+                <div className="space-y-3">
+                  <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
+                  <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
+                  <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
                 </div>
               )}
             </div>
@@ -449,8 +502,14 @@ export default function App() {
       </div>
 
         {isCreateOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
-            <div className="glass max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
+            onClick={() => setIsCreateOpen(false)}
+          >
+            <div
+              className="glass max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6"
+              onClick={event => event.stopPropagation()}
+            >
               <div className="mb-4 flex items-center justify-between">
                 <div className="text-xs uppercase tracking-[0.3em] text-slate-400">יצירת משימה</div>
                 <button
@@ -480,6 +539,7 @@ export default function App() {
                   list="user-options"
                   value={newCreatedBy}
                   onChange={event => setNewCreatedBy(event.target.value)}
+                  onFocus={onUserFocus}
                   placeholder="נוצר על ידי"
                   className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
                 />
@@ -513,8 +573,14 @@ export default function App() {
         )}
 
         {isDetailOpen && selectedTask && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4">
-            <div className="glass max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl p-6">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
+            onClick={onCloseDetail}
+          >
+            <div
+              className="glass max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl p-6"
+              onClick={event => event.stopPropagation()}
+            >
               <div className="mb-4 flex items-center justify-between">
                 <div className="text-xs uppercase tracking-[0.3em] text-slate-400">פרטי משימה</div>
                 <button
@@ -529,6 +595,7 @@ export default function App() {
                 task={selectedTask}
                 progress={selectedProgress}
                 histogram={selectedHistogram}
+                isHistogramLoading={isHistogramLoading}
                 ranges={selectedRanges}
                 onDeleteTask={onDeleteTask}
                 onClearPartitions={onClearPartitions}
@@ -537,6 +604,9 @@ export default function App() {
                 isClearingPartitions={isClearingPartitions}
                 deletingRangeKey={deletingRangeKey}
                 deletingRangeMode={deletingRangeMode}
+                rangeDoneKey={rangeDoneKey}
+                rangeDoneMode={rangeDoneMode}
+                actionNote={actionNote}
               />
             </div>
           </div>

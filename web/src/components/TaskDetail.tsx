@@ -6,6 +6,7 @@ type Props = {
   task: TaskSummary | null;
   progress: TaskProgress | null;
   histogram: TaskStatusHistogram | null;
+  isHistogramLoading: boolean;
   ranges: TaskRange[];
   onDeleteTask: () => void;
   onClearPartitions: () => void;
@@ -14,12 +15,16 @@ type Props = {
   isClearingPartitions: boolean;
   deletingRangeKey: string | null;
   deletingRangeMode: string | null;
+  rangeDoneKey: string | null;
+  rangeDoneMode: string | null;
+  actionNote: string | null;
 };
 
 export default function TaskDetail({
   task,
   progress,
   histogram,
+  isHistogramLoading,
   ranges,
   onDeleteTask,
   onClearPartitions,
@@ -27,7 +32,10 @@ export default function TaskDetail({
   isDeletingTask,
   isClearingPartitions,
   deletingRangeKey,
-  deletingRangeMode
+  deletingRangeMode,
+  rangeDoneKey,
+  rangeDoneMode,
+  actionNote
 }: Props) {
   if (!task) {
     return (
@@ -63,13 +71,20 @@ export default function TaskDetail({
       </div>
 
       <div className="mt-6">
-        <StatusHistogramChart histogram={histogram} />
+        <StatusHistogramChart histogram={histogram} isLoading={isHistogramLoading} />
       </div>
+
+      {actionNote && <div className="mt-4 text-xs text-emerald-200">{actionNote}</div>}
 
       <div className="mt-6">
         <div className="text-xs uppercase tracking-[0.2em] text-slate-400">טווחים</div>
         <div className="mt-3 space-y-3">
-          {ranges.length === 0 && <div className="text-sm text-slate-400">אין טווחים</div>}
+          {ranges.length === 0 && (
+            <div className="space-y-2">
+              <div className="h-12 w-full animate-pulse rounded-xl border border-slate-700/70 bg-slate-900/70" />
+              <div className="h-12 w-full animate-pulse rounded-xl border border-slate-700/70 bg-slate-900/70" />
+            </div>
+          )}
           {ranges.map(range => (
             <div key={`${range.timeFrom}-${range.timeTo}`} className="rounded-xl border border-slate-700/70 p-3">
               <div className="text-sm text-slate-200">
@@ -80,23 +95,25 @@ export default function TaskDetail({
                   const rangeKey = `${range.timeFrom}-${range.timeTo}`;
                   const isDeletingPartitions = deletingRangeKey === rangeKey && deletingRangeMode === "partitions";
                   const isDeletingRange = deletingRangeKey === rangeKey && deletingRangeMode === "range";
+                  const isDonePartitions = rangeDoneKey === rangeKey && rangeDoneMode === "partitions";
+                  const isDoneRange = rangeDoneKey === rangeKey && rangeDoneMode === "range";
                   return (
                     <>
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "partitions")}
-                  disabled={isDeletingPartitions}
+                  disabled={isDeletingPartitions || isDonePartitions}
                   className="btn-hover rounded-lg border border-amber-400/60 px-3 py-1 text-xs uppercase tracking-[0.2em] text-amber-100"
                 >
-                  {isDeletingPartitions ? "מוחק..." : "מחק פרטישנים"}
+                  {isDeletingPartitions ? "מוחק..." : isDonePartitions ? "נמחק" : "מחק פרטישנים"}
                 </button>
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "range")}
-                  disabled={isDeletingRange}
+                  disabled={isDeletingRange || isDoneRange}
                   className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200"
                 >
-                  {isDeletingRange ? "מוחק..." : "מחק טווח"}
+                  {isDeletingRange ? "מוחק..." : isDoneRange ? "נמחק" : "מחק טווח"}
                 </button>
                     </>
                   );

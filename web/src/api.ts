@@ -9,9 +9,15 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:5000/api";
 const rawMock = import.meta.env.VITE_USE_MOCK;
+const rawMockDelay = import.meta.env.VITE_MOCK_DELAY_MS;
 const USE_MOCK = rawMock === undefined
   ? true
   : String(rawMock).toLowerCase() === "true" || String(rawMock) === "1";
+const MOCK_DELAY_MS = rawMockDelay === undefined
+  ? 800
+  : Math.max(0, Number(rawMockDelay));
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const buildQuery = (params: Record<string, string | number | boolean | undefined>) => {
   const search = new URLSearchParams();
@@ -223,6 +229,7 @@ const advanceTask = (taskId: string) => {
 
 const mockApi = {
   getUsers: async (query?: string) => {
+    await delay(MOCK_DELAY_MS);
     if (!query) {
       return mockUsers.slice(0, 10);
     }
@@ -236,6 +243,7 @@ const mockApi = {
     take?: number;
     includeProgress?: boolean;
   }) => {
+    await delay(MOCK_DELAY_MS);
     let items = [...mockTasks];
     if (params.search) {
       items = items.filter(task => task.taskId.includes(params.search ?? ""));
@@ -251,11 +259,13 @@ const mockApi = {
   getTaskRanges: async (taskId: string) => mockRanges[taskId] ?? [],
 
   getProgress: async (taskId: string) => {
+    await delay(MOCK_DELAY_MS);
     advanceTask(taskId);
     return mockTasks.find(task => task.taskId === taskId)?.progress ?? buildProgress(0, 0, 0);
   },
 
   getMetrics: async (taskId: string) => {
+    await delay(MOCK_DELAY_MS);
     advanceTask(taskId);
     return mockMetrics[taskId] ?? {
       progress: buildProgress(0, 0, 0),
@@ -264,11 +274,13 @@ const mockApi = {
   },
 
   getStatusHistogram: async (taskId: string, intervalSeconds?: number) => {
+    await delay(MOCK_DELAY_MS);
     advanceTask(taskId);
     return buildMockStatusHistogram(taskId, intervalSeconds ?? 300);
   },
 
   createTask: async (payload: TaskCreateRequest) => {
+    await delay(MOCK_DELAY_MS);
     if (!payload.taskId) {
       throw new Error("TaskId is required.");
     }
@@ -307,6 +319,7 @@ const mockApi = {
   },
 
   deleteTask: async (taskId: string) => {
+    await delay(MOCK_DELAY_MS);
     const index = mockTasks.findIndex(task => task.taskId === taskId);
     if (index >= 0) {
       mockTasks.splice(index, 1);
@@ -317,6 +330,7 @@ const mockApi = {
   },
 
   deletePartitions: async (taskId: string) => {
+    await delay(MOCK_DELAY_MS);
     const task = mockTasks.find(entry => entry.taskId === taskId);
     if (task?.progress) {
       task.progress = buildProgress(task.progress.total, 0, 0);
@@ -328,6 +342,7 @@ const mockApi = {
   },
 
   deleteRange: async (taskId: string, from: string, to: string, mode: string) => {
+    await delay(MOCK_DELAY_MS);
     const list = mockRanges[taskId];
     if (!list) {
       return;
