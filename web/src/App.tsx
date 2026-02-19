@@ -692,7 +692,7 @@ export default function App() {
             onClick={onCloseDetail}
           >
             <div
-              className="glass max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl p-6"
+              className="glass flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl p-6"
               onClick={event => event.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between">
@@ -705,6 +705,7 @@ export default function App() {
                   סגור
                 </button>
               </div>
+              <div className="min-h-0 flex-1 overflow-y-auto pe-2">
               <TaskDetail
                 task={selectedTask}
                 progress={selectedProgress}
@@ -724,6 +725,7 @@ export default function App() {
                 rangeDoneMode={rangeDoneMode}
                 actionNote={actionNote}
               />
+              </div>
             </div>
           </div>
         )}

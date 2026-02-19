@@ -104,20 +104,45 @@ export default function TaskDetail({
               <div className="h-12 w-full animate-pulse rounded-xl border border-slate-700/70 bg-slate-900/70" />
             </div>
           )}
-          {ranges.map(range => (
-            <div key={`${range.timeFrom}-${range.timeTo}`} className="rounded-xl border border-slate-700/70 p-3">
-              <div className="text-sm text-slate-200">
-                {new Date(range.timeFrom).toLocaleString()} - {new Date(range.timeTo).toLocaleString()}
+          {ranges.map(range => {
+            const from = new Date(range.timeFrom);
+            const to = new Date(range.timeTo);
+            const diffMs = to.getTime() - from.getTime();
+            const diffH = Math.floor(diffMs / 3_600_000);
+            const diffM = Math.floor((diffMs % 3_600_000) / 60_000);
+            const durationParts: string[] = [];
+            if (diffH > 0) durationParts.push(`${diffH} שעות`);
+            if (diffM > 0) durationParts.push(`${diffM} דקות`);
+            if (durationParts.length === 0) durationParts.push("פחות מדקה");
+            const duration = durationParts.join(" ו-");
+            const fmtDate = (d: Date) => d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
+            const fmtTime = (d: Date) => d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            const rangeKey = `${range.timeFrom}-${range.timeTo}`;
+            const isDeletingPartitions = deletingRangeKey === rangeKey && deletingRangeMode === "partitions";
+            const isDeletingRange = deletingRangeKey === rangeKey && deletingRangeMode === "range";
+            const isDonePartitions = rangeDoneKey === rangeKey && rangeDoneMode === "partitions";
+            const isDoneRange = rangeDoneKey === rangeKey && rangeDoneMode === "range";
+
+            return (
+            <div key={rangeKey} className="rounded-xl border border-slate-700/70 bg-slate-900/40 p-4">
+              <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                <span className="text-slate-500">מ:</span>
+                <span className="text-slate-200 tabular-nums">
+                  <span className="font-medium">{fmtDate(from)}</span>
+                  <span className="mx-1.5 text-slate-600">|</span>
+                  <span>{fmtTime(from)}</span>
+                </span>
+                <span className="text-slate-500">עד:</span>
+                <span className="text-slate-200 tabular-nums">
+                  <span className="font-medium">{fmtDate(to)}</span>
+                  <span className="mx-1.5 text-slate-600">|</span>
+                  <span>{fmtTime(to)}</span>
+                </span>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(() => {
-                  const rangeKey = `${range.timeFrom}-${range.timeTo}`;
-                  const isDeletingPartitions = deletingRangeKey === rangeKey && deletingRangeMode === "partitions";
-                  const isDeletingRange = deletingRangeKey === rangeKey && deletingRangeMode === "range";
-                  const isDonePartitions = rangeDoneKey === rangeKey && rangeDoneMode === "partitions";
-                  const isDoneRange = rangeDoneKey === rangeKey && rangeDoneMode === "range";
-                  return (
-                    <>
+              <div className="mt-2 text-xs text-slate-500">
+                משך: <span className="text-slate-400">{duration}</span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => onDeleteRange(range, "partitions")}
@@ -134,12 +159,10 @@ export default function TaskDetail({
                 >
                   {isDeletingRange ? "מוחק..." : isDoneRange ? "נמחק" : "מחק טווח"}
                 </button>
-                    </>
-                  );
-                })()}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

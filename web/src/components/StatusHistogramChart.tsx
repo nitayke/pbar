@@ -115,10 +115,7 @@ export default function StatusHistogramChart({ histogram, isLoading, taskId, par
 
   return (
     <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4" dir="ltr">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs uppercase tracking-[0.2em] text-slate-400">התפלגות סטטוסים לאורך זמן</div>
-        <div className="text-xs text-slate-400">bucket: {histogram.intervalSeconds}s</div>
-      </div>
+      <div className="text-xs uppercase tracking-[0.2em] text-slate-400">התפלגות סטטוסים לאורך זמן</div>
 
       <div className="mt-4 rounded-xl border border-slate-700/70 bg-slate-950/60 p-2" dir="ltr">
         <ReactECharts
