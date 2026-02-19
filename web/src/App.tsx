@@ -38,9 +38,10 @@ type FilterChipsProps = {
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  onReset?: () => void;
 };
 
-function FilterChips({ label, value, options, onChange }: FilterChipsProps) {
+function FilterChips({ label, value, options, onChange, onReset }: FilterChipsProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -63,7 +64,19 @@ function FilterChips({ label, value, options, onChange }: FilterChipsProps) {
 
   return (
     <div ref={rootRef} className="relative">
-      <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">{label}</label>
+      <div className="mb-2 flex items-center justify-between">
+        <label className="block text-xs uppercase tracking-[0.2em] text-slate-400">{label}</label>
+        {onReset && (
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={value === "all"}
+            className="btn-hover rounded-md border border-slate-600 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            איפוס
+          </button>
+        )}
+      </div>
       <button
         type="button"
         onClick={() => setOpen(previous => !previous)}
@@ -454,7 +467,7 @@ export default function App() {
         <header className="mb-4 flex items-start justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-[0.6em] text-slate-400">בקרת משימות</div>
-          <h1 className="mt-2 font-display text-4xl text-white">PBAR 2.0</h1>
+          <h1 className="mt-2 font-display text-5xl font-extrabold tracking-[0.08em] text-white">PBAR 2.0</h1>
         </div>
         <button
           type="button"
@@ -491,10 +504,14 @@ export default function App() {
                     <button
                       key={type.value}
                       type="button"
-                      onClick={() => setFilterType(type.value)}
+                      onClick={() =>
+                        setFilterType(current =>
+                          current === type.value && type.value !== "all" ? "all" : type.value
+                        )
+                      }
                       className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
                         filterType === type.value
-                          ? "bg-white text-slate-900"
+                          ? "bg-cyan-400/20 text-cyan-100"
                           : "btn-hover border border-slate-600 text-slate-200"
                       }`}
                     >
@@ -522,7 +539,9 @@ export default function App() {
                     <button
                       key={option}
                       type="button"
-                      onClick={() => setMaterialFilter(option)}
+                      onClick={() =>
+                        setMaterialFilter(current => (current === option ? "all" : option))
+                      }
                       className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
                         materialFilter === option
                           ? "bg-cyan-400/20 text-cyan-100"
@@ -540,6 +559,7 @@ export default function App() {
                 value={sourceFilter}
                 options={sourceOptions}
                 onChange={setSourceFilter}
+                onReset={() => setSourceFilter("all")}
               />
 
               <FilterChips
@@ -547,6 +567,7 @@ export default function App() {
                 value={targetFilter}
                 options={targetOptions}
                 onChange={setTargetFilter}
+                onReset={() => setTargetFilter("all")}
               />
 
               <div className="flex items-center gap-3">

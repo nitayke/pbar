@@ -5,7 +5,7 @@ module.exports = {
   	extend: {
   		fontFamily: {
   			display: [
-  				'Heebo',
+					'Space Grotesk',
   				'sans-serif'
   			],
   			body: [
