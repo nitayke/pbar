@@ -46,10 +46,17 @@ export default function RangeEditor({ ranges, onChange }: Props) {
     onChange(ranges.filter(range => range.id !== id));
   };
 
+  const isRangeInvalid = (range: RangeDraft) => {
+    const from = parseLocalDateTime(range.timeFrom);
+    const to = parseLocalDateTime(range.timeTo);
+    return from && to && to <= from;
+  };
+
   return (
     <div className="space-y-3">
       {ranges.map(range => (
-        <div key={range.id} className="flex flex-wrap items-center gap-3">
+        <div key={range.id} className="space-y-1">
+        <div className="flex flex-wrap items-center gap-5">
           <DatePicker
             selected={parseLocalDateTime(range.timeFrom)}
             onChange={date => updateRange(range.id, "timeFrom", date ? toLocalDateTimeValue(date) : "")}
@@ -81,6 +88,10 @@ export default function RangeEditor({ ranges, onChange }: Props) {
           >
             הסר
           </button>
+        </div>
+        {isRangeInvalid(range) && (
+          <p className="text-xs text-rose-400">זמן הסיום חייב להיות אחרי זמן ההתחלה</p>
+        )}
         </div>
       ))}
       <button

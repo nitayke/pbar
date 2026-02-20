@@ -1,4 +1,5 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { api } from "./api";
@@ -12,6 +13,12 @@ import type {
 import RangeEditor, { type RangeDraft } from "./components/RangeEditor";
 import TaskCard from "./components/TaskCard";
 import TaskDetail from "./components/TaskDetail";
+
+const pad = (v: number) => String(v).padStart(2, "0");
+const toLocalISOString = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+const toLocalDateTimeValue = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 const buildRequestRanges = (ranges: RangeDraft[]): TaskRange[] =>
   ranges
@@ -148,6 +155,15 @@ export default function App() {
   const [rangeDoneMode, setRangeDoneMode] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showMessage = useCallback((text: string, autoDismissMs?: number) => {
+    if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
+    setMessage(text);
+    if (autoDismissMs) {
+      messageTimerRef.current = setTimeout(() => setMessage(null), autoDismissMs);
+    }
+  }, []);
 
   const selectedTask = useMemo(
     () => tasks.find(task => task.taskId === selectedTaskId) ?? null,
@@ -216,7 +232,7 @@ export default function App() {
       });
       setTasks(data);
     } catch (error) {
-      setMessage((error as Error).message);
+      showMessage((error as Error).message);
     } finally {
       setIsLoadingTasks(false);
     }
@@ -252,7 +268,7 @@ export default function App() {
         setSelectedProgress(progress);
         setSelectedHistogram(histogram);
       } catch (error) {
-        setMessage((error as Error).message);
+        showMessage((error as Error).message);
       } finally {
         setIsHistogramLoading(false);
       }
@@ -316,6 +332,15 @@ export default function App() {
     setMessage(null);
     setIsCreatingTask(true);
 
+    const invalidRange = newRanges.find(
+      r => r.timeFrom && r.timeTo && new Date(r.timeTo) <= new Date(r.timeFrom)
+    );
+    if (invalidRange) {
+      showMessage("זמן הסיום חייב להיות אחרי זמן ההתחלה בכל הטווחים");
+      setIsCreatingTask(false);
+      return;
+    }
+
     const payload: TaskCreateRequest = {
       taskId: newTaskId.trim(),
       description: newDescription,
@@ -331,10 +356,10 @@ export default function App() {
       setNewCreatedBy("");
       setNewRanges([]);
       setIsCreateOpen(false);
-      setMessage("משימה נוצרה.");
+      showMessage("משימה נוצרה.", 3000);
       fetchTasks();
     } catch (error) {
-      setMessage((error as Error).message);
+      showMessage((error as Error).message);
     } finally {
       setIsCreatingTask(false);
     }
@@ -347,7 +372,7 @@ export default function App() {
     setIsDeletingTask(true);
     try {
       await api.deleteTask(selectedTaskId);
-      setMessage("משימה נמחקה.");
+      showMessage("משימה נמחקה.", 3000);
       setSelectedTaskId(null);
       setSelectedRanges([]);
       setSelectedHistogram(null);
@@ -417,9 +442,12 @@ export default function App() {
     setIsAddRangeOpen(true);
   };
 
+  const addRangeInvalid =
+    addRangeFrom && addRangeTo && new Date(addRangeTo) <= new Date(addRangeFrom);
+
   const onAddRange = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedTaskId || !addRangeFrom || !addRangeTo) {
+    if (!selectedTaskId || !addRangeFrom || !addRangeTo || addRangeInvalid) {
       return;
     }
     setIsAddingRange(true);
@@ -436,7 +464,7 @@ export default function App() {
       setIsAddRangeOpen(false);
       fetchTasks();
     } catch (error) {
-      setMessage((error as Error).message);
+      showMessage((error as Error).message);
     } finally {
       setIsAddingRange(false);
     }
@@ -455,7 +483,7 @@ export default function App() {
       );
       setSelectedHistogram(histogram);
     } catch (error) {
-      setMessage((error as Error).message);
+      showMessage((error as Error).message);
     } finally {
       setIsHistogramLoading(false);
     }
@@ -570,15 +598,35 @@ export default function App() {
                 onReset={() => setTargetFilter("all")}
               />
 
+              {(filterType !== "all" || materialFilter !== "all" || sourceFilter !== "all" || targetFilter !== "all" || search) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterType("all");
+                    setMaterialFilter("all");
+                    setSourceFilter("all");
+                    setTargetFilter("all");
+                    setSearch("");
+                  }}
+                  className="btn-hover w-full rounded-lg border border-rose-500/60 px-3 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
+                >
+                  איפוס כל הסינונים
+                </button>
+              )}
+
               <div className="flex items-center gap-3">
                 <label className="text-xs uppercase tracking-[0.2em] text-slate-400">רענון (ש')</label>
-                <input
-                  type="number"
-                  min={2}
-                  value={pollSeconds}
-                  onChange={event => setPollSeconds(Number(event.target.value))}
-                  className="w-20 rounded-lg border border-slate-700 bg-slate-900/70 px-2 py-1 text-sm"
-                />
+                <div className="flex items-center overflow-hidden rounded-lg border border-slate-700">
+                  <button type="button" onClick={() => setPollSeconds(p => Math.max(2, p - 1))} className="btn-hover px-2 py-1 text-sm text-slate-300">−</button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={pollSeconds}
+                    onChange={event => { const v = Number(event.target.value); if (!Number.isNaN(v) && v >= 2) setPollSeconds(v); }}
+                    className="w-12 border-x border-slate-700 bg-slate-900/70 py-1 text-center text-sm text-slate-100 outline-none"
+                  />
+                  <button type="button" onClick={() => setPollSeconds(p => p + 1)} className="btn-hover px-2 py-1 text-sm text-slate-300">+</button>
+                </div>
               </div>
             </div>
             {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
@@ -664,13 +712,17 @@ export default function App() {
                 </datalist>
                 <div className="flex items-center gap-3">
                   <label className="text-xs uppercase tracking-[0.2em] text-slate-400">שניות חלוקה</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={partitionSizeSeconds}
-                    onChange={event => setPartitionSizeSeconds(Number(event.target.value))}
-                    className="w-24 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                  />
+                  <div className="flex items-center overflow-hidden rounded-xl border border-slate-700">
+                    <button type="button" onClick={() => setPartitionSizeSeconds(p => Math.max(1, p - 10))} className="btn-hover px-2.5 py-2 text-sm text-slate-300">−</button>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={partitionSizeSeconds}
+                      onChange={event => { const v = Number(event.target.value); if (!Number.isNaN(v) && v >= 1) setPartitionSizeSeconds(v); }}
+                      className="w-16 border-x border-slate-700 bg-slate-900/70 py-2 text-center text-sm text-slate-100 outline-none"
+                    />
+                    <button type="button" onClick={() => setPartitionSizeSeconds(p => p + 10)} className="btn-hover px-2.5 py-2 text-sm text-slate-300">+</button>
+                  </div>
                 </div>
                 <RangeEditor ranges={newRanges} onChange={setNewRanges} />
                 <button
@@ -750,33 +802,71 @@ export default function App() {
                 </button>
               </div>
 
-              <form className="space-y-3" onSubmit={onAddRange}>
-                <DatePicker
-                  selected={addRangeFrom ? new Date(addRangeFrom) : null}
-                  onChange={(date: Date | null) => setAddRangeFrom(date ? date.toISOString().slice(0, 16) : "")}
-                  showTimeSelect
-                  timeIntervals={5}
-                  timeFormat="HH:mm"
-                  dateFormat="yyyy-MM-dd HH:mm"
-                  className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                  placeholderText="זמן התחלה"
-                  required
-                />
-                <DatePicker
-                  selected={addRangeTo ? new Date(addRangeTo) : null}
-                  onChange={(date: Date | null) => setAddRangeTo(date ? date.toISOString().slice(0, 16) : "")}
-                  showTimeSelect
-                  timeIntervals={5}
-                  timeFormat="HH:mm"
-                  dateFormat="yyyy-MM-dd HH:mm"
-                  className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                  placeholderText="זמן סיום"
-                  required
-                />
+              <form className="space-y-5" onSubmit={onAddRange}>
+                <div>
+                  <label className="mb-1.5 block text-xs text-slate-400">זמן התחלה</label>
+                  <DatePicker
+                    selected={addRangeFrom ? new Date(addRangeFrom) : null}
+                    onChange={(date: Date | null) => setAddRangeFrom(date ? toLocalDateTimeValue(date) : "")}
+                    showTimeSelect
+                    timeIntervals={5}
+                    timeFormat="HH:mm"
+                    dateFormat="yyyy-MM-dd HH:mm"
+                    className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                    placeholderText="זמן התחלה"
+                    required
+                    popperContainer={({ children }) => createPortal(children, document.body)}
+                    popperClassName="date-picker-popper"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs text-slate-400">זמן סיום</label>
+                  <DatePicker
+                    selected={addRangeTo ? new Date(addRangeTo) : null}
+                    onChange={(date: Date | null) => setAddRangeTo(date ? toLocalDateTimeValue(date) : "")}
+                    showTimeSelect
+                    timeIntervals={5}
+                    timeFormat="HH:mm"
+                    dateFormat="yyyy-MM-dd HH:mm"
+                    className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
+                    placeholderText="זמן סיום"
+                    required
+                    popperContainer={({ children }) => createPortal(children, document.body)}
+                    popperClassName="date-picker-popper"
+                  />
+                </div>
+                {addRangeFrom && addRangeTo && !addRangeInvalid && (() => {
+                  const diffMs = new Date(addRangeTo).getTime() - new Date(addRangeFrom).getTime();
+                  const weeks = Math.floor(diffMs / 604_800_000);
+                  const days = Math.floor((diffMs % 604_800_000) / 86_400_000);
+                  const hours = Math.floor((diffMs % 86_400_000) / 3_600_000);
+                  const minutes = Math.floor((diffMs % 3_600_000) / 60_000);
+                  const parts: string[] = [];
+                  if (weeks > 0) parts.push(`${weeks} שבועות`);
+                  if (days > 0) parts.push(`${days} ימים`);
+                  if (hours > 0) parts.push(`${hours} שעות`);
+                  if (minutes > 0) parts.push(`${minutes} דקות`);
+                  const partitionSize = selectedTask?.partitionSizeSeconds;
+                  const bulkSize = partitionSize ? Math.ceil(diffMs / 1000 / partitionSize) : null;
+                  return (
+                    <div className="rounded-lg border border-slate-700/60 bg-slate-900/50 px-3 py-2 text-center text-xs text-slate-300">
+                      <span>גודל הטווח: <span className="font-medium text-cyan-200">{parts.join(" ו-") || "פחות מדקה"}</span></span>
+                      {bulkSize !== null && (
+                        <span className="mx-2 text-slate-600">|</span>
+                      )}
+                      {bulkSize !== null && (
+                        <span>מספר פרטישנים: <span className="font-medium text-cyan-200">{bulkSize.toLocaleString()}</span></span>
+                      )}
+                    </div>
+                  );
+                })()}
+                {addRangeInvalid && (
+                  <p className="text-xs text-rose-400">זמן הסיום חייב להיות אחרי זמן ההתחלה</p>
+                )}
                 <button
                   type="submit"
-                  disabled={isAddingRange}
-                  className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+                  disabled={isAddingRange || !!addRangeInvalid}
+                  className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200 disabled:opacity-50"
                 >
                   {isAddingRange ? "מוסיף..." : "הוסף טווח"}
                 </button>
