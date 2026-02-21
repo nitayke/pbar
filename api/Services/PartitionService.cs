@@ -15,8 +15,18 @@ public sealed class PartitionService : IPartitionService
 
     public async Task<TaskProgressDto> GetProgressAsync(string taskId)
     {
+        var task = await _uow.Tasks.GetByIdAsync(taskId);
+        if (task is null)
+        {
+            return new TaskProgressDto();
+        }
+
         var counts = await _uow.Partitions.GetStatusCountsAsync(taskId);
-        return TaskStatusHelper.BuildProgress(counts);
+        var ranges = await _uow.Ranges.GetByTaskIdAsync(taskId);
+        var partitionSizeSeconds = task.PartitionSizeSeconds ?? 300;
+        var expectedTotal = TaskStatusHelper.CalculateExpectedTotal(ranges, partitionSizeSeconds);
+
+        return TaskStatusHelper.BuildProgress(counts, expectedTotal);
     }
 
     public async Task<object> GetPartitionsAsync(string taskId, int? skip, int? take)

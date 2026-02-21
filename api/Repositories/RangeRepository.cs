@@ -22,6 +22,25 @@ public sealed class RangeRepository : IRangeRepository
             .ToListAsync();
     }
 
+    public async Task<Dictionary<string, List<TaskTimeRange>>> GetByTaskIdsAsync(IEnumerable<string> taskIds)
+    {
+        var ids = taskIds.ToArray();
+        if (ids.Length == 0)
+        {
+            return new Dictionary<string, List<TaskTimeRange>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var ranges = await _db.TaskTimeRanges
+            .AsNoTracking()
+            .Where(r => ids.Contains(r.TaskId))
+            .OrderBy(r => r.TimeFrom)
+            .ToListAsync();
+
+        return ranges
+            .GroupBy(r => r.TaskId)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+    }
+
     public async Task CreateAsync(TaskTimeRange range)
     {
         _db.TaskTimeRanges.Add(range);

@@ -38,7 +38,21 @@ public sealed class TaskService : ITaskService
         {
             var ids = tasks.Select(t => t.TaskId).ToArray();
             var countsMap = await _uow.Partitions.GetStatusCountsForTasksAsync(ids);
-            var progressMap = TaskStatusHelper.BuildProgressMap(countsMap);
+            var rangesMap = await _uow.Ranges.GetByTaskIdsAsync(ids);
+
+            var expectedTotals = entities.ToDictionary(
+                entity => entity.TaskId,
+                entity =>
+                {
+                    var partitionSizeSeconds = entity.PartitionSizeSeconds ?? 300;
+                    var ranges = rangesMap.TryGetValue(entity.TaskId, out var taskRanges)
+                        ? taskRanges
+                        : Enumerable.Empty<TaskTimeRange>();
+                    return TaskStatusHelper.CalculateExpectedTotal(ranges, partitionSizeSeconds);
+                },
+                StringComparer.OrdinalIgnoreCase);
+
+            var progressMap = TaskStatusHelper.BuildProgressMap(ids, countsMap, expectedTotals);
 
             foreach (var task in tasks)
             {
@@ -106,7 +120,8 @@ public sealed class TaskService : ITaskService
             {
                 TaskId = request.TaskId,
                 TimeFrom = range.TimeFrom,
-                TimeTo = range.TimeTo
+                TimeTo = range.TimeTo,
+                CreationTime = now
             });
         }
 

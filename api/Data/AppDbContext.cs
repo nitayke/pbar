@@ -43,6 +43,7 @@ public sealed class AppDbContext : DbContext
             builder.Property(r => r.TaskId).HasColumnName("TASK_ID");
             builder.Property(r => r.TimeFrom).HasColumnName("TIME_FROM");
             builder.Property(r => r.TimeTo).HasColumnName("TIME_TO");
+            builder.Property(r => r.CreationTime).HasColumnName("CREATION_TIME");
         });
     }
 }

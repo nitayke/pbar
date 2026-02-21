@@ -21,6 +21,7 @@ export type TaskSummary = {
 export type TaskRange = {
   timeFrom: string;
   timeTo: string;
+  creationTime?: string;
 };
 
 export type TaskMetricSample = {

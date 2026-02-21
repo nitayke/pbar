@@ -30,7 +30,11 @@ public sealed class TaskRepository : ITaskRepository
         }
 
         return await query
-            .OrderByDescending(t => t.LastUpdate)
+            .OrderByDescending(t =>
+                _db.TaskTimeRanges
+                    .Where(r => r.TaskId == t.TaskId)
+                    .Max(r => (DateTime?)r.CreationTime))
+            .ThenByDescending(t => t.LastUpdate)
             .Skip(Math.Max(skip, 0))
             .Take(Math.Clamp(take, 1, 500))
             .ToListAsync();

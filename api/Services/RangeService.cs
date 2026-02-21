@@ -23,7 +23,8 @@ public sealed class RangeService : IRangeService
         return ranges.Select(r => new TaskRangeDto
         {
             TimeFrom = r.TimeFrom,
-            TimeTo = r.TimeTo
+            TimeTo = r.TimeTo,
+            CreationTime = r.CreationTime
         }).ToList();
     }
 
@@ -45,7 +46,8 @@ public sealed class RangeService : IRangeService
         {
             TaskId = taskId,
             TimeFrom = range.TimeFrom,
-            TimeTo = range.TimeTo
+            TimeTo = range.TimeTo,
+            CreationTime = DateTime.UtcNow
         };
 
         await _uow.BeginTransactionAsync();

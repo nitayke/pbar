@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Pbar.Api.Contracts;
 using Pbar.Api.Data;
+using Pbar.Api.Models;
 using Pbar.Api.Repositories;
 
 namespace Pbar.Api.Services;
@@ -37,18 +38,34 @@ public sealed class TaskMetricsSampler : BackgroundService
         using var db = await _contextFactory.CreateDbContextAsync(stoppingToken);
 
         var lookback = DateTime.UtcNow.AddMinutes(-_options.Value.LookbackMinutes);
-        var taskIds = await db.Tasks.AsNoTracking()
+        var taskRows = await db.Tasks.AsNoTracking()
             .Where(t => t.LastUpdate >= lookback)
             .OrderByDescending(t => t.LastUpdate)
             .Take(_options.Value.MaxTasks)
-            .Select(t => t.TaskId)
+            .Select(t => new { t.TaskId, t.PartitionSizeSeconds })
             .ToListAsync(stoppingToken);
 
-        if (taskIds.Count == 0) return;
+        var taskIds = taskRows.Select(t => t.TaskId).ToArray();
+        if (taskIds.Length == 0) return;
 
         var partitionRepo = new PartitionRepository(db);
+        var rangeRepo = new RangeRepository(db);
         var countsMap = await partitionRepo.GetStatusCountsForTasksAsync(taskIds);
-        var progressMap = TaskStatusHelper.BuildProgressMap(countsMap);
+        var rangesMap = await rangeRepo.GetByTaskIdsAsync(taskIds);
+
+        var expectedTotals = taskRows.ToDictionary(
+            row => row.TaskId,
+            row =>
+            {
+                var partitionSizeSeconds = row.PartitionSizeSeconds ?? 300;
+                var ranges = rangesMap.TryGetValue(row.TaskId, out var taskRanges)
+                    ? taskRanges
+                    : Enumerable.Empty<TaskTimeRange>();
+                return TaskStatusHelper.CalculateExpectedTotal(ranges, partitionSizeSeconds);
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        var progressMap = TaskStatusHelper.BuildProgressMap(taskIds, countsMap, expectedTotals);
         var timestamp = DateTime.UtcNow;
 
         foreach (var taskId in taskIds)
