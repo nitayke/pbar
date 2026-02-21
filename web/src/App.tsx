@@ -20,12 +20,13 @@ const toLocalISOString = (d: Date) =>
 const toLocalDateTimeValue = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
-const buildRequestRanges = (ranges: RangeDraft[]): TaskRange[] =>
+const buildRequestRanges = (ranges: RangeDraft[], createdBy: string): TaskRange[] =>
   ranges
     .filter(range => range.timeFrom && range.timeTo)
     .map(range => ({
       timeFrom: new Date(range.timeFrom).toISOString(),
-      timeTo: new Date(range.timeTo).toISOString()
+      timeTo: new Date(range.timeTo).toISOString(),
+      createdBy
     }));
 
 const parseTaskMeta = (taskId: string) => {
@@ -126,7 +127,9 @@ export default function App() {
   const [materialFilter, setMaterialFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all");
+  const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [search, setSearch] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("");
   const [pollSeconds, setPollSeconds] = useState(5);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedRanges, setSelectedRanges] = useState<TaskRange[]>([]);
@@ -136,8 +139,6 @@ export default function App() {
 
   const [newTaskId, setNewTaskId] = useState("");
   const [newDescription, setNewDescription] = useState("");
-  const [newCreatedBy, setNewCreatedBy] = useState("");
-  const [userOptions, setUserOptions] = useState<string[]>([]);
   const [newRanges, setNewRanges] = useState<RangeDraft[]>([]);
   const [partitionSizeSeconds, setPartitionSizeSeconds] = useState<number>(300);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -224,10 +225,16 @@ export default function App() {
 
   const fetchTasks = async () => {
     try {
+      if (!currentUserName) {
+        setTasks([]);
+        return;
+      }
+
       const data = await api.getTasks({
         type: filterType === "all" ? undefined : filterType,
         search,
-        includeProgress: false,
+        createdBy: myTasksOnly ? currentUserName : undefined,
+        includeProgress: true,
         take: 200
       });
       setTasks(data);
@@ -241,12 +248,12 @@ export default function App() {
   useEffect(() => {
     setIsLoadingTasks(true);
     fetchTasks();
-  }, [filterType, search]);
+  }, [filterType, search, myTasksOnly, currentUserName]);
 
   useEffect(() => {
     const handle = setInterval(fetchTasks, pollSeconds * 1000);
     return () => clearInterval(handle);
-  }, [pollSeconds, filterType, search]);
+  }, [pollSeconds, filterType, search, myTasksOnly, currentUserName]);
 
   useEffect(() => {
     if (!selectedTaskId) {
@@ -278,22 +285,22 @@ export default function App() {
   }, [selectedTaskId, selectedTask?.partitionSizeSeconds]);
 
   useEffect(() => {
-    if (!newCreatedBy) {
-      setUserOptions([]);
+    const key = "pbar.currentUserName";
+    const existing = window.localStorage.getItem(key)?.trim();
+    if (existing) {
+      setCurrentUserName(existing);
       return;
     }
 
-    const handle = setTimeout(async () => {
-      try {
-        const users = await api.getUsers(newCreatedBy);
-        setUserOptions(users);
-      } catch {
-        setUserOptions([]);
-      }
-    }, 300);
+    const input = window.prompt("מה השם שלך?")?.trim() ?? "";
+    if (!input) {
+      showMessage("יש להזין שם משתמש כדי להמשיך.");
+      return;
+    }
 
-    return () => clearTimeout(handle);
-  }, [newCreatedBy]);
+    window.localStorage.setItem(key, input);
+    setCurrentUserName(input);
+  }, [showMessage]);
 
   useEffect(() => {
     if (!isCreateOpen && !isDetailOpen) {
@@ -315,22 +322,16 @@ export default function App() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isCreateOpen, isDetailOpen]);
 
-  const onUserFocus = async () => {
-    if (userOptions.length > 0) {
-      return;
-    }
-    try {
-      const users = await api.getUsers("");
-      setUserOptions(users);
-    } catch {
-      setUserOptions([]);
-    }
-  };
-
   const onCreateTask = async (event: FormEvent) => {
     event.preventDefault();
     setMessage(null);
     setIsCreatingTask(true);
+
+    if (!currentUserName.trim()) {
+      showMessage("יש להזין שם משתמש לפני יצירת משימה.");
+      setIsCreatingTask(false);
+      return;
+    }
 
     const invalidRange = newRanges.find(
       r => r.timeFrom && r.timeTo && new Date(r.timeTo) <= new Date(r.timeFrom)
@@ -344,8 +345,7 @@ export default function App() {
     const payload: TaskCreateRequest = {
       taskId: newTaskId.trim(),
       description: newDescription,
-      createdBy: newCreatedBy,
-      ranges: buildRequestRanges(newRanges),
+      ranges: buildRequestRanges(newRanges, currentUserName),
       partitionSizeSeconds
     };
 
@@ -353,7 +353,6 @@ export default function App() {
       await api.createTask(payload);
       setNewTaskId("");
       setNewDescription("");
-      setNewCreatedBy("");
       setNewRanges([]);
       setIsCreateOpen(false);
       showMessage("משימה נוצרה.", 3000);
@@ -450,11 +449,16 @@ export default function App() {
     if (!selectedTaskId || !addRangeFrom || !addRangeTo || addRangeInvalid) {
       return;
     }
+    if (!currentUserName.trim()) {
+      showMessage("יש להזין שם משתמש לפני הוספת טווח.");
+      return;
+    }
     setIsAddingRange(true);
     try {
       const range: TaskRange = {
         timeFrom: new Date(addRangeFrom).toISOString(),
-        timeTo: new Date(addRangeTo).toISOString()
+        timeTo: new Date(addRangeTo).toISOString(),
+        createdBy: currentUserName
       };
       await api.addTaskRange(selectedTaskId, range);
       const ranges = await api.getTaskRanges(selectedTaskId);
@@ -550,6 +554,23 @@ export default function App() {
               </div>
 
               <div>
+                <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">בעלות</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMyTasksOnly(current => !current)}
+                    className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
+                      myTasksOnly
+                        ? "bg-cyan-400/20 text-cyan-100"
+                        : "btn-hover border border-slate-600 text-slate-200"
+                    }`}
+                  >
+                    המשימות שלי
+                  </button>
+                </div>
+              </div>
+
+              <div>
                 <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">סוג חומר</label>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -598,7 +619,7 @@ export default function App() {
                 onReset={() => setTargetFilter("all")}
               />
 
-              {(filterType !== "all" || materialFilter !== "all" || sourceFilter !== "all" || targetFilter !== "all" || search) && (
+              {(filterType !== "all" || materialFilter !== "all" || sourceFilter !== "all" || targetFilter !== "all" || myTasksOnly || search) && (
                 <button
                   type="button"
                   onClick={() => {
@@ -606,6 +627,7 @@ export default function App() {
                     setMaterialFilter("all");
                     setSourceFilter("all");
                     setTargetFilter("all");
+                    setMyTasksOnly(false);
                     setSearch("");
                   }}
                   className="btn-hover w-full rounded-lg border border-rose-500/60 px-3 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
@@ -697,19 +719,6 @@ export default function App() {
                   placeholder="תיאור"
                   className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
                 />
-                <input
-                  list="user-options"
-                  value={newCreatedBy}
-                  onChange={event => setNewCreatedBy(event.target.value)}
-                  onFocus={onUserFocus}
-                  placeholder="נוצר על ידי"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                />
-                <datalist id="user-options">
-                  {userOptions.map(user => (
-                    <option key={user} value={user} />
-                  ))}
-                </datalist>
                 <div className="flex items-center gap-3">
                   <label className="text-xs uppercase tracking-[0.2em] text-slate-400">שניות חלוקה</label>
                   <div className="flex items-center overflow-hidden rounded-xl border border-slate-700">

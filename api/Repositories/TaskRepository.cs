@@ -14,7 +14,7 @@ public sealed class TaskRepository : ITaskRepository
         _db = db;
     }
 
-    public async Task<List<TaskEntity>> GetAllAsync(string? type, string? search, int skip, int take)
+    public async Task<List<TaskEntity>> GetAllAsync(string? type, string? search, string? createdBy, int skip, int take)
     {
         var query = _db.Tasks.AsNoTracking();
 
@@ -27,6 +27,12 @@ public sealed class TaskRepository : ITaskRepository
         {
             var normalized = type.Trim().ToLowerInvariant();
             query = TaskTypeHelper.ApplyTypeFilter(query, normalized);
+        }
+
+        if (!string.IsNullOrWhiteSpace(createdBy))
+        {
+            var owner = createdBy.Trim();
+            query = query.Where(t => _db.TaskTimeRanges.Any(r => r.TaskId == t.TaskId && r.CreatedBy == owner));
         }
 
         return await query

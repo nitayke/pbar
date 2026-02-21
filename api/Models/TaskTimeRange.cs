@@ -6,4 +6,5 @@ public sealed class TaskTimeRange
     public DateTime TimeFrom { get; set; }
     public DateTime TimeTo { get; set; }
     public DateTime CreationTime { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
 }

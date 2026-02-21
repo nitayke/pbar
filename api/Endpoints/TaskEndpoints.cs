@@ -12,11 +12,12 @@ public static class TaskEndpoints
             ITaskService taskService,
             string? type,
             string? search,
+            string? createdBy,
             int? skip,
             int? take,
             bool? includeProgress) =>
         {
-            var tasks = await taskService.GetTasksAsync(type, search, skip, take, includeProgress == true);
+            var tasks = await taskService.GetTasksAsync(type, search, createdBy, skip, take, includeProgress == true);
             return Results.Ok(tasks);
         });
 

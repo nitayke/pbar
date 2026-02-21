@@ -22,7 +22,6 @@ public sealed class AppDbContext : DbContext
             builder.Property(t => t.TaskId).HasColumnName("TASK_ID");
             builder.Property(t => t.Description).HasColumnName("DESCRIPTION");
             builder.Property(t => t.LastUpdate).HasColumnName("LAST_UPDATE");
-            builder.Property(t => t.CreatedBy).HasColumnName("CREATED_BY");
             builder.Property(t => t.PartitionSizeSeconds).HasColumnName("PARTITION_SIZE_SECONDS");
         });
 
@@ -44,6 +43,7 @@ public sealed class AppDbContext : DbContext
             builder.Property(r => r.TimeFrom).HasColumnName("TIME_FROM");
             builder.Property(r => r.TimeTo).HasColumnName("TIME_TO");
             builder.Property(r => r.CreationTime).HasColumnName("CREATION_TIME");
+            builder.Property(r => r.CreatedBy).HasColumnName("CREATED_BY");
         });
     }
 }

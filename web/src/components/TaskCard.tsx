@@ -9,6 +9,14 @@ type Props = {
 export default function TaskCard({ task, selected, onSelect }: Props) {
   const typeLabel =
     task.type === "reflow" ? "ריפלו" : task.type === "hermetics" ? "הרמטיות" : "אחר";
+  const progress = task.progress;
+  const total = progress?.total ?? 0;
+  const done = progress?.done ?? 0;
+  const inProgress = progress?.inProgress ?? 0;
+  const todo = progress?.todo ?? 0;
+  const donePct = total > 0 ? (done * 100) / total : 0;
+  const inProgressPct = total > 0 ? (inProgress * 100) / total : 0;
+  const todoPct = total > 0 ? (todo * 100) / total : 0;
 
   return (
     <button
@@ -30,8 +38,19 @@ export default function TaskCard({ task, selected, onSelect }: Props) {
         <div className="text-xs text-slate-400">{new Date(task.lastUpdate).toLocaleString()}</div>
       </div>
       <p className="task-description mt-2 max-h-16 overflow-y-auto pr-1 text-sm text-slate-300">{task.description || "ללא תיאור"}</p>
-      <div className="mt-2 text-xs text-slate-400">נוצר על ידי: {task.createdBy || "-"}</div>
-      <div className="mt-1 text-xs text-slate-400">גודל חלוקה: {task.partitionSizeSeconds ?? "-"} שניות</div>
+      <div className="mt-2 text-xs text-slate-400">גודל חלוקה: {task.partitionSizeSeconds ?? "-"} שניות</div>
+      <div className="mt-2 overflow-hidden rounded-full border border-slate-700 bg-slate-900/70">
+        <div className="flex h-2 w-full">
+          <div className="bg-emerald-500/80" style={{ width: `${donePct}%` }} />
+          <div className="bg-cyan-500/80" style={{ width: `${inProgressPct}%` }} />
+          <div className="bg-slate-500/80" style={{ width: `${todoPct}%` }} />
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-300">
+        <span>TODO: {todo}</span>
+        <span>IN_PROGRESS: {inProgress}</span>
+        <span>DONE: {done}</span>
+      </div>
     </button>
   );
 }

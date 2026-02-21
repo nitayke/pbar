@@ -17,19 +17,18 @@ public sealed class TaskService : ITaskService
         _partitioningOptions = partitioningOptions.Value;
     }
 
-    public async Task<List<TaskSummaryDto>> GetTasksAsync(string? type, string? search, int? skip, int? take, bool includeProgress)
+    public async Task<List<TaskSummaryDto>> GetTasksAsync(string? type, string? search, string? createdBy, int? skip, int? take, bool includeProgress)
     {
         var safeSkip = Math.Max(skip ?? 0, 0);
         var safeTake = Math.Clamp(take ?? 100, 1, 500);
 
-        var entities = await _uow.Tasks.GetAllAsync(type, search, safeSkip, safeTake);
+        var entities = await _uow.Tasks.GetAllAsync(type, search, createdBy, safeSkip, safeTake);
 
         var tasks = entities.Select(t => new TaskSummaryDto
         {
             TaskId = t.TaskId,
             Description = t.Description,
             LastUpdate = t.LastUpdate,
-            CreatedBy = t.CreatedBy,
             PartitionSizeSeconds = t.PartitionSizeSeconds,
             Type = TaskTypeHelper.GetType(t.TaskId)
         }).ToList();
@@ -76,7 +75,6 @@ public sealed class TaskService : ITaskService
             TaskId = entity.TaskId,
             Description = entity.Description,
             LastUpdate = entity.LastUpdate,
-            CreatedBy = entity.CreatedBy,
             PartitionSizeSeconds = entity.PartitionSizeSeconds,
             Type = TaskTypeHelper.GetType(entity.TaskId)
         };
@@ -105,7 +103,6 @@ public sealed class TaskService : ITaskService
         {
             TaskId = request.TaskId,
             Description = request.Description ?? string.Empty,
-            CreatedBy = request.CreatedBy ?? string.Empty,
             LastUpdate = now,
             PartitionSizeSeconds = partitionSizeSeconds
         };
@@ -116,12 +113,16 @@ public sealed class TaskService : ITaskService
             if (range.TimeTo <= range.TimeFrom)
                 throw new ArgumentException("TimeTo must be after TimeFrom.");
 
+            if (string.IsNullOrWhiteSpace(range.CreatedBy))
+                throw new ArgumentException("CreatedBy is required in each range.");
+
             rangeEntities.Add(new TaskTimeRange
             {
                 TaskId = request.TaskId,
                 TimeFrom = range.TimeFrom,
                 TimeTo = range.TimeTo,
-                CreationTime = now
+                CreationTime = now,
+                CreatedBy = range.CreatedBy.Trim()
             });
         }
 

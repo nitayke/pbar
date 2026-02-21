@@ -12,7 +12,6 @@ export type TaskSummary = {
   taskId: string;
   description: string;
   lastUpdate: string;
-  createdBy: string;
   partitionSizeSeconds?: number;
   type: "reflow" | "hermetics" | "other";
   progress?: TaskProgress;
@@ -22,6 +21,7 @@ export type TaskRange = {
   timeFrom: string;
   timeTo: string;
   creationTime?: string;
+  createdBy?: string;
 };
 
 export type TaskMetricSample = {
@@ -56,7 +56,6 @@ export type TaskStatusHistogram = {
 export type TaskCreateRequest = {
   taskId: string;
   description?: string;
-  createdBy?: string;
   ranges: TaskRange[];
   partitionMinutes?: number;
   partitionSizeSeconds?: number;

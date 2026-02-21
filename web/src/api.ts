@@ -67,8 +67,6 @@ const buildProgress = (total: number, done: number, inProgress = 0): TaskProgres
   };
 };
 
-const mockUsers = ["alice", "ben", "dana", "matan", "shira", "yossi"];
-
 const mockState: Record<string, { lastTick: number }> = {};
 
 const mockTasks: TaskSummary[] = [
@@ -76,7 +74,6 @@ const mockTasks: TaskSummary[] = [
     taskId: "reflow-cars-elastic-west-to-elastic-east",
     description: "בדיקת ריפלו",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    createdBy: "dana",
     partitionSizeSeconds: 300,
     type: "reflow",
     progress: buildProgress(1200, 820, 210)
@@ -85,7 +82,6 @@ const mockTasks: TaskSummary[] = [
     taskId: "hermetics-boys-oracle-east-to-elastic-west",
     description: "שיפור תהליך",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
-    createdBy: "yossi",
     partitionSizeSeconds: 600,
     type: "hermetics",
     progress: buildProgress(900, 420, 190)
@@ -94,7 +90,6 @@ const mockTasks: TaskSummary[] = [
     taskId: "reflow-boys-oracle-west-to-elastic-east",
     description: "תחזוקה",
     lastUpdate: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
-    createdBy: "alice",
     partitionSizeSeconds: 300,
     type: "other",
     progress: buildProgress(300, 120, 30)
@@ -105,25 +100,44 @@ const mockRanges: Record<string, TaskRange[]> = {
   "reflow-cars-elastic-west-to-elastic-east": [
     {
       timeFrom: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-      timeTo: new Date(Date.now() - 1000 * 60 * 120).toISOString()
+      timeTo: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+      creationTime: new Date(Date.now() - 1000 * 60 * 200).toISOString(),
+      createdBy: "dana"
     },
     {
       timeFrom: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-      timeTo: new Date(Date.now() - 1000 * 60 * 60).toISOString()
+      timeTo: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+      creationTime: new Date(Date.now() - 1000 * 60 * 125).toISOString(),
+      createdBy: "dana"
     }
   ],
   "hermetics-boys-oracle-east-to-elastic-west": [
     {
       timeFrom: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
-      timeTo: new Date(Date.now() - 1000 * 60 * 180).toISOString()
+      timeTo: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+      creationTime: new Date(Date.now() - 1000 * 60 * 230).toISOString(),
+      createdBy: "yossi"
     }
   ],
   "reflow-boys-oracle-west-to-elastic-east": [
     {
       timeFrom: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-      timeTo: new Date(Date.now() - 1000 * 60 * 30).toISOString()
+      timeTo: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      creationTime: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
+      createdBy: "alice"
     }
   ]
+};
+
+const getLatestRangeCreation = (taskId: string) => {
+  const ranges = mockRanges[taskId] ?? [];
+  if (ranges.length === 0) {
+    return 0;
+  }
+
+  return Math.max(
+    ...ranges.map(range => Date.parse(range.creationTime ?? range.timeTo ?? range.timeFrom))
+  );
 };
 
 const buildSamples = (total: number, done: number, points = 8) => {
@@ -256,17 +270,10 @@ const advanceTask = (taskId: string) => {
 };
 
 const mockApi = {
-  getUsers: async (query?: string) => {
-    await delay(MOCK_DELAY_MS);
-    if (!query) {
-      return mockUsers.slice(0, 10);
-    }
-    return mockUsers.filter(user => user.toLowerCase().includes(query.toLowerCase())).slice(0, 10);
-  },
-
   getTasks: async (params: {
     type?: string;
     search?: string;
+    createdBy?: string;
     skip?: number;
     take?: number;
     includeProgress?: boolean;
@@ -279,6 +286,11 @@ const mockApi = {
     if (params.type && params.type !== "all") {
       items = items.filter(task => task.type === params.type);
     }
+    if (params.createdBy) {
+      const owner = params.createdBy;
+      items = items.filter(task => (mockRanges[task.taskId] ?? []).some(range => range.createdBy === owner));
+    }
+    items.sort((a, b) => getLatestRangeCreation(b.taskId) - getLatestRangeCreation(a.taskId));
     const start = Math.max(0, params.skip ?? 0);
     const end = start + Math.min(params.take ?? 200, 500);
     
@@ -333,7 +345,6 @@ const mockApi = {
       taskId: payload.taskId,
       description: payload.description ?? "",
       lastUpdate: new Date().toISOString(),
-      createdBy: payload.createdBy ?? "",
       partitionSizeSeconds,
       type: payload.taskId.toLowerCase().includes("reflow")
         ? "reflow"
@@ -343,7 +354,10 @@ const mockApi = {
       progress
     };
     mockTasks.unshift(task);
-    mockRanges[payload.taskId] = payload.ranges ?? [];
+    mockRanges[payload.taskId] = (payload.ranges ?? []).map(range => ({
+      ...range,
+      creationTime: range.creationTime ?? new Date().toISOString()
+    }));
     mockMetrics[payload.taskId] = {
       progress,
       partitionsPerMinute: rate,
@@ -363,7 +377,10 @@ const mockApi = {
     if (!mockRanges[taskId]) {
       mockRanges[taskId] = [];
     }
-    mockRanges[taskId].push(range);
+    mockRanges[taskId].push({
+      ...range,
+      creationTime: range.creationTime ?? new Date().toISOString()
+    });
     if (task.progress) {
       task.progress.total += 120;
       task.progress.todo += 120;
@@ -420,12 +437,10 @@ const mockApi = {
 export const api = USE_MOCK
   ? mockApi
   : {
-      getUsers: (query?: string) =>
-        request<string[]>(`/users${buildQuery({ query })}`),
-
       getTasks: (params: {
         type?: string;
         search?: string;
+        createdBy?: string;
         skip?: number;
         take?: number;
         includeProgress?: boolean;

@@ -24,7 +24,8 @@ public sealed class RangeService : IRangeService
         {
             TimeFrom = r.TimeFrom,
             TimeTo = r.TimeTo,
-            CreationTime = r.CreationTime
+            CreationTime = r.CreationTime,
+            CreatedBy = r.CreatedBy
         }).ToList();
     }
 
@@ -37,6 +38,9 @@ public sealed class RangeService : IRangeService
         if (range.TimeFrom >= range.TimeTo)
             return (false, "TimeFrom must be before TimeTo");
 
+        if (string.IsNullOrWhiteSpace(range.CreatedBy))
+            return (false, "CreatedBy is required");
+
         var partitionSizeSeconds = task.PartitionSizeSeconds ?? _partitioningOptions.PartitionMinutes * 60;
         var todoStatus = string.IsNullOrWhiteSpace(_partitioningOptions.PartitionStatusTodo)
             ? "TODO"
@@ -47,7 +51,8 @@ public sealed class RangeService : IRangeService
             TaskId = taskId,
             TimeFrom = range.TimeFrom,
             TimeTo = range.TimeTo,
-            CreationTime = DateTime.UtcNow
+            CreationTime = DateTime.UtcNow,
+            CreatedBy = range.CreatedBy.Trim()
         };
 
         await _uow.BeginTransactionAsync();
