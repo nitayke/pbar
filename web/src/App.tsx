@@ -1,243 +1,79 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import type {
-  TaskCreateRequest,
   TaskProgress,
   TaskRange,
   TaskStatusHistogram,
-  TaskSummary
+  TaskSummary,
 } from "./types";
-import RangeEditor, { type RangeDraft } from "./components/RangeEditor";
-import TaskCard from "./components/TaskCard";
-import TaskDetail from "./components/TaskDetail";
+import { parseTaskMeta } from "./lib/taskUtils";
+import { useCurrentUser } from "./hooks/useCurrentUser";
+import { useMessage } from "./hooks/useMessage";
+import { useEscapeKey } from "./hooks/useEscapeKey";
 
-const pad = (v: number) => String(v).padStart(2, "0");
-const toLocalISOString = (d: Date) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-const toLocalDateTimeValue = (d: Date) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-const USER_NAME_STORAGE_KEY = "pbar.currentUserName";
-
-const buildRequestRanges = (ranges: RangeDraft[], createdBy: string): TaskRange[] =>
-  ranges
-    .filter(range => range.timeFrom && range.timeTo)
-    .map(range => ({
-      timeFrom: new Date(range.timeFrom).toISOString(),
-      timeTo: new Date(range.timeTo).toISOString(),
-      createdBy
-    }));
-
-const parseTaskMeta = (taskId: string) => {
-  const [leftSide, targetSide] = taskId.split("-to-");
-  const leftParts = (leftSide ?? "").split("-").filter(Boolean);
-
-  return {
-    processType: leftParts[0],
-    materialType: leftParts[1],
-    sourceSystem: leftParts.slice(2).join("-") || undefined,
-    targetSystem: targetSide || undefined
-  };
-};
-
-type FilterChipsProps = {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-  onReset?: () => void;
-};
-
-function FilterChips({ label, value, options, onChange, onReset }: FilterChipsProps) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!rootRef.current) {
-        return;
-      }
-      if (!rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const allOptions = ["all", ...options.filter(option => option !== "all")];
-  const getOptionLabel = (option: string) => (option === "all" ? "הכל" : option);
-
-  return (
-    <div ref={rootRef} className="relative">
-      <div className="mb-2 flex items-center justify-between">
-        <label className="block text-xs uppercase tracking-[0.2em] text-slate-400">{label}</label>
-        {onReset && (
-          <button
-            type="button"
-            onClick={onReset}
-            disabled={value === "all"}
-            className="btn-hover rounded-md border border-slate-600 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-slate-300 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            איפוס
-          </button>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={() => setOpen(previous => !previous)}
-        className="btn-hover flex w-full items-center justify-between rounded-lg border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
-      >
-        <span>{getOptionLabel(value)}</span>
-        <span className="text-slate-400">▾</span>
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-600 bg-slate-950/95 p-1 shadow-lg shadow-slate-950/50">
-          {allOptions.map(option => {
-            const isActive = value === option;
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => {
-                  onChange(option);
-                  setOpen(false);
-                }}
-                className={`btn-hover mb-1 w-full rounded-lg px-3 py-2 text-right text-sm transition last:mb-0 ${
-                  isActive ? "bg-cyan-500/20 text-cyan-100" : "text-slate-200 hover:bg-slate-800/80"
-                }`}
-              >
-                {getOptionLabel(option)}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+import WelcomeScreen from "./components/WelcomeScreen";
+import FilterSidebar from "./components/FilterSidebar";
+import TaskListPanel from "./components/TaskListPanel";
+import CreateTaskModal from "./components/CreateTaskModal";
+import TaskDetailModal from "./components/TaskDetailModal";
+import AddRangeModal from "./components/AddRangeModal";
 
 export default function App() {
-  const [tasks, setTasks] = useState<TaskSummary[]>([]);
-  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
+  /* ── user ─────────────────────────────────────────────── */
+  const { currentUserName, nameInput, setNameInput, saveUserName } =
+    useCurrentUser();
+  const { message, showMessage, clearMessage } = useMessage();
+
+  const onSaveUserName = () => {
+    if (!saveUserName(nameInput)) {
+      showMessage("יש להזין שם משתמש כדי להמשיך.");
+    } else {
+      clearMessage();
+    }
+  };
+
+  /* ── filters ──────────────────────────────────────────── */
   const [filterType, setFilterType] = useState("all");
   const [materialFilter, setMaterialFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all");
   const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [search, setSearch] = useState("");
-  const [currentUserName, setCurrentUserName] = useState("");
-  const [nameInput, setNameInput] = useState("");
   const [pollSeconds, setPollSeconds] = useState(5);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [selectedRanges, setSelectedRanges] = useState<TaskRange[]>([]);
-  const [selectedProgress, setSelectedProgress] = useState<TaskProgress | null>(null);
-  const [selectedHistogram, setSelectedHistogram] = useState<TaskStatusHistogram | null>(null);
-  const [isHistogramLoading, setIsHistogramLoading] = useState(false);
 
-  const [newTaskId, setNewTaskId] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [newRanges, setNewRanges] = useState<RangeDraft[]>([]);
-  const [partitionSizeSeconds, setPartitionSizeSeconds] = useState<number>(300);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isAddRangeOpen, setIsAddRangeOpen] = useState(false);
-  const [addRangeFrom, setAddRangeFrom] = useState("");
-  const [addRangeTo, setAddRangeTo] = useState("");
-  const [isAddingRange, setIsAddingRange] = useState(false);
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [isDeletingTask, setIsDeletingTask] = useState(false);
-  const [isClearingPartitions, setIsClearingPartitions] = useState(false);
-  const [deletingRangeKey, setDeletingRangeKey] = useState<string | null>(null);
-  const [deletingRangeMode, setDeletingRangeMode] = useState<string | null>(null);
-  const [rangeDoneKey, setRangeDoneKey] = useState<string | null>(null);
-  const [rangeDoneMode, setRangeDoneMode] = useState<string | null>(null);
-  const [actionNote, setActionNote] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasActiveFilters =
+    filterType !== "all" ||
+    materialFilter !== "all" ||
+    sourceFilter !== "all" ||
+    targetFilter !== "all" ||
+    myTasksOnly ||
+    !!search;
 
-  const showMessage = useCallback((text: string, autoDismissMs?: number) => {
-    if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
-    setMessage(text);
-    if (autoDismissMs) {
-      messageTimerRef.current = setTimeout(() => setMessage(null), autoDismissMs);
-    }
-  }, []);
+  const resetAllFilters = () => {
+    setFilterType("all");
+    setMaterialFilter("all");
+    setSourceFilter("all");
+    setTargetFilter("all");
+    setMyTasksOnly(false);
+    setSearch("");
+  };
 
-  const selectedTask = useMemo(
-    () => tasks.find(task => task.taskId === selectedTaskId) ?? null,
-    [tasks, selectedTaskId]
-  );
+  /* ── tasks ────────────────────────────────────────────── */
+  const [tasks, setTasks] = useState<TaskSummary[]>([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
-  const taskMetas = useMemo(
-    () =>
-      tasks.map(task => ({
-        task,
-        meta: parseTaskMeta(task.taskId)
-      })),
-    [tasks]
-  );
-
-  const materialOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(taskMetas.map(({ meta }) => meta.materialType).filter((value): value is string => Boolean(value)))
-      ).sort(),
-    [taskMetas]
-  );
-
-  const sourceOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(taskMetas.map(({ meta }) => meta.sourceSystem).filter((value): value is string => Boolean(value)))
-      ).sort(),
-    [taskMetas]
-  );
-
-  const targetOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(taskMetas.map(({ meta }) => meta.targetSystem).filter((value): value is string => Boolean(value)))
-      ).sort(),
-    [taskMetas]
-  );
-
-  const filteredTasks = useMemo(
-    () =>
-      taskMetas
-        .filter(({ meta }) => {
-          if (materialFilter !== "all" && meta.materialType !== materialFilter) {
-            return false;
-          }
-          if (sourceFilter !== "all" && meta.sourceSystem !== sourceFilter) {
-            return false;
-          }
-          if (targetFilter !== "all" && meta.targetSystem !== targetFilter) {
-            return false;
-          }
-          return true;
-        })
-        .map(({ task }) => task),
-    [taskMetas, materialFilter, sourceFilter, targetFilter]
-  );
-
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       if (!currentUserName) {
         setTasks([]);
         return;
       }
-
       const data = await api.getTasks({
         type: filterType === "all" ? undefined : filterType,
         search,
         createdBy: myTasksOnly ? currentUserName : undefined,
         includeProgress: true,
-        take: 200
+        take: 200,
       });
       setTasks(data);
     } catch (error) {
@@ -245,18 +81,93 @@ export default function App() {
     } finally {
       setIsLoadingTasks(false);
     }
-  };
+  }, [filterType, search, myTasksOnly, currentUserName, showMessage]);
 
   useEffect(() => {
     setIsLoadingTasks(true);
     fetchTasks();
-  }, [filterType, search, myTasksOnly, currentUserName]);
+  }, [fetchTasks]);
 
   useEffect(() => {
     const handle = setInterval(fetchTasks, pollSeconds * 1000);
     return () => clearInterval(handle);
-  }, [pollSeconds, filterType, search, myTasksOnly, currentUserName]);
+  }, [pollSeconds, fetchTasks]);
 
+  /* ── derived filter options ───────────────────────────── */
+  const taskMetas = useMemo(
+    () => tasks.map((t) => ({ task: t, meta: parseTaskMeta(t.taskId) })),
+    [tasks]
+  );
+
+  const unique = <T,>(arr: (T | undefined)[]) =>
+    Array.from(new Set(arr.filter((v): v is T => Boolean(v)))).sort() as T[];
+
+  const materialOptions = useMemo(
+    () => unique(taskMetas.map(({ meta }) => meta.materialType)),
+    [taskMetas]
+  );
+  const sourceOptions = useMemo(
+    () => unique(taskMetas.map(({ meta }) => meta.sourceSystem)),
+    [taskMetas]
+  );
+  const targetOptions = useMemo(
+    () => unique(taskMetas.map(({ meta }) => meta.targetSystem)),
+    [taskMetas]
+  );
+
+  const filteredTasks = useMemo(
+    () =>
+      taskMetas
+        .filter(({ meta }) => {
+          if (materialFilter !== "all" && meta.materialType !== materialFilter) return false;
+          if (sourceFilter !== "all" && meta.sourceSystem !== sourceFilter) return false;
+          if (targetFilter !== "all" && meta.targetSystem !== targetFilter) return false;
+          return true;
+        })
+        .map(({ task }) => task),
+    [taskMetas, materialFilter, sourceFilter, targetFilter]
+  );
+
+  /* ── detail modal state ──────────────────────────────── */
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedRanges, setSelectedRanges] = useState<TaskRange[]>([]);
+  const [selectedProgress, setSelectedProgress] = useState<TaskProgress | null>(null);
+  const [selectedHistogram, setSelectedHistogram] = useState<TaskStatusHistogram | null>(null);
+  const [isHistogramLoading, setIsHistogramLoading] = useState(false);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
+  const [isClearingPartitions, setIsClearingPartitions] = useState(false);
+  const [deletingRangeKey, setDeletingRangeKey] = useState<string | null>(null);
+  const [deletingRangeMode, setDeletingRangeMode] = useState<string | null>(null);
+  const [rangeDoneKey, setRangeDoneKey] = useState<string | null>(null);
+  const [rangeDoneMode, setRangeDoneMode] = useState<string | null>(null);
+  const [actionNote, setActionNote] = useState<string | null>(null);
+
+  const selectedTask = useMemo(
+    () => tasks.find((t) => t.taskId === selectedTaskId) ?? null,
+    [tasks, selectedTaskId]
+  );
+
+  /* ── modal toggles ───────────────────────────────────── */
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isAddRangeOpen, setIsAddRangeOpen] = useState(false);
+
+  const onOpenDetail = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setIsDetailOpen(true);
+  };
+
+  const onCloseDetail = useCallback(() => {
+    setIsDetailOpen(false);
+    setSelectedTaskId(null);
+    setSelectedRanges([]);
+    setSelectedHistogram(null);
+  }, []);
+
+  useEscapeKey(isCreateOpen, () => setIsCreateOpen(false));
+  useEscapeKey(isDetailOpen, onCloseDetail);
+
+  /* ── detail fetch ─────────────────────────────────────── */
   useEffect(() => {
     if (!selectedTaskId) {
       setSelectedHistogram(null);
@@ -264,14 +175,13 @@ export default function App() {
       setIsDetailOpen(false);
       return;
     }
-
-    const fetchDetail = async () => {
+    (async () => {
       setIsHistogramLoading(true);
       try {
         const [ranges, progress, histogram] = await Promise.all([
           api.getTaskRanges(selectedTaskId),
           api.getProgress(selectedTaskId),
-          api.getStatusHistogram(selectedTaskId, selectedTask?.partitionSizeSeconds)
+          api.getStatusHistogram(selectedTaskId, selectedTask?.partitionSizeSeconds),
         ]);
         setSelectedRanges(ranges);
         setSelectedProgress(progress);
@@ -281,127 +191,25 @@ export default function App() {
       } finally {
         setIsHistogramLoading(false);
       }
-    };
+    })();
+  }, [selectedTaskId, selectedTask?.partitionSizeSeconds, showMessage]);
 
-    fetchDetail();
-  }, [selectedTaskId, selectedTask?.partitionSizeSeconds]);
-
-  useEffect(() => {
-    const existing = window.localStorage.getItem(USER_NAME_STORAGE_KEY)?.trim();
-    if (existing) {
-      setCurrentUserName(existing);
-      setNameInput(existing);
-    }
-  }, []);
-
-  const onSaveUserName = () => {
-    const trimmed = nameInput.trim();
-    if (!trimmed) {
-      showMessage("יש להזין שם משתמש כדי להמשיך.");
-      return;
-    }
-
-    window.localStorage.setItem(USER_NAME_STORAGE_KEY, trimmed);
-    setCurrentUserName(trimmed);
-    setMessage(null);
-  };
-
-  useEffect(() => {
-    if (!isCreateOpen && !isDetailOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        if (isCreateOpen) {
-          setIsCreateOpen(false);
-        }
-        if (isDetailOpen) {
-          onCloseDetail();
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isCreateOpen, isDetailOpen]);
-
-  const onCreateTask = async (event: FormEvent) => {
-    event.preventDefault();
-    setMessage(null);
-    setIsCreatingTask(true);
-
-    if (!currentUserName.trim()) {
-      showMessage("יש להזין שם משתמש לפני יצירת משימה.");
-      setIsCreatingTask(false);
-      return;
-    }
-
-    const invalidRange = newRanges.find(
-      r => r.timeFrom && r.timeTo && new Date(r.timeTo) <= new Date(r.timeFrom)
-    );
-    if (invalidRange) {
-      showMessage("זמן הסיום חייב להיות אחרי זמן ההתחלה בכל הטווחים");
-      setIsCreatingTask(false);
-      return;
-    }
-
-    const payload: TaskCreateRequest = {
-      taskId: newTaskId.trim(),
-      description: newDescription,
-      ranges: buildRequestRanges(newRanges, currentUserName),
-      partitionSizeSeconds
-    };
-
-    try {
-      await api.createTask(payload);
-      setNewTaskId("");
-      setNewDescription("");
-      setNewRanges([]);
-      setIsCreateOpen(false);
-      showMessage("משימה נוצרה.", 3000);
-      fetchTasks();
-    } catch (error) {
-      showMessage((error as Error).message);
-    } finally {
-      setIsCreatingTask(false);
-    }
-  };
-
+  /* ── detail actions ───────────────────────────────────── */
   const onDeleteTask = async () => {
-    if (!selectedTaskId) {
-      return;
-    }
+    if (!selectedTaskId) return;
     setIsDeletingTask(true);
     try {
       await api.deleteTask(selectedTaskId);
       showMessage("משימה נמחקה.", 3000);
-      setSelectedTaskId(null);
-      setSelectedRanges([]);
-      setSelectedHistogram(null);
-      setIsDetailOpen(false);
+      onCloseDetail();
       fetchTasks();
     } finally {
       setIsDeletingTask(false);
     }
   };
 
-  const onOpenDetail = (taskId: string) => {
-    setSelectedTaskId(taskId);
-    setIsDetailOpen(true);
-  };
-
-  const onCloseDetail = () => {
-    setIsDetailOpen(false);
-    setSelectedTaskId(null);
-    setSelectedRanges([]);
-    setSelectedHistogram(null);
-  };
-
   const onClearPartitions = async () => {
-    if (!selectedTaskId) {
-      return;
-    }
+    if (!selectedTaskId) return;
     setIsClearingPartitions(true);
     try {
       await api.deletePartitions(selectedTaskId);
@@ -414,9 +222,7 @@ export default function App() {
   };
 
   const onDeleteRange = async (range: TaskRange, mode: string) => {
-    if (!selectedTaskId) {
-      return;
-    }
+    if (!selectedTaskId) return;
     const rangeKey = `${range.timeFrom}-${range.timeTo}`;
     setDeletingRangeKey(rangeKey);
     setDeletingRangeMode(mode);
@@ -439,56 +245,21 @@ export default function App() {
     }
   };
 
-  const onOpenAddRange = () => {
-    setAddRangeFrom("");
-    setAddRangeTo("");
-    setIsAddRangeOpen(true);
-  };
-
-  const addRangeInvalid =
-    addRangeFrom && addRangeTo && new Date(addRangeTo) <= new Date(addRangeFrom);
-
-  const onAddRange = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!selectedTaskId || !addRangeFrom || !addRangeTo || addRangeInvalid) {
-      return;
-    }
-    if (!currentUserName.trim()) {
-      showMessage("יש להזין שם משתמש לפני הוספת טווח.");
-      return;
-    }
-    setIsAddingRange(true);
-    try {
-      const range: TaskRange = {
-        timeFrom: new Date(addRangeFrom).toISOString(),
-        timeTo: new Date(addRangeTo).toISOString(),
-        createdBy: currentUserName
-      };
-      await api.addTaskRange(selectedTaskId, range);
-      const ranges = await api.getTaskRanges(selectedTaskId);
-      setSelectedRanges(ranges);
-      setActionNote("טווח נוסף.");
-      setTimeout(() => setActionNote(null), 1800);
-      setIsAddRangeOpen(false);
-      fetchTasks();
-    } catch (error) {
-      showMessage((error as Error).message);
-    } finally {
-      setIsAddingRange(false);
-    }
+  const onAddRangeSubmit = async (range: TaskRange) => {
+    if (!selectedTaskId) return;
+    await api.addTaskRange(selectedTaskId, range);
+    const ranges = await api.getTaskRanges(selectedTaskId);
+    setSelectedRanges(ranges);
+    setActionNote("טווח נוסף.");
+    setTimeout(() => setActionNote(null), 1800);
+    fetchTasks();
   };
 
   const onHistogramZoom = async (from: Date, to: Date) => {
     if (!selectedTaskId) return;
-    
     setIsHistogramLoading(true);
     try {
-      const histogram = await api.getStatusHistogram(
-        selectedTaskId,
-        undefined,
-        from,
-        to
-      );
+      const histogram = await api.getStatusHistogram(selectedTaskId, undefined, from, to);
       setSelectedHistogram(histogram);
     } catch (error) {
       showMessage((error as Error).message);
@@ -497,431 +268,117 @@ export default function App() {
     }
   };
 
+  /* ── render ───────────────────────────────────────────── */
   return (
     <div className="relative h-screen overflow-hidden px-6 py-6 text-right text-white" dir="rtl">
       <div className="relative z-10">
+        {/* Header */}
         <header className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <div className="text-xs uppercase tracking-[0.6em] text-slate-400">בקרת משימות</div>
-          <h1 className="mt-2 font-display text-5xl font-extrabold tracking-[0.08em] text-white">PBAR 2.0</h1>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setMessage(null);
-            setIsCreateOpen(true);
-          }}
-          className="btn-hover rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
-        >
-          יצירת משימה
-        </button>
+          <div>
+            <div className="text-xs uppercase tracking-[0.6em] text-slate-400">בקרת משימות</div>
+            <h1 className="mt-2 font-display text-5xl font-extrabold tracking-[0.08em] text-white">
+              PBAR 2.0
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              clearMessage();
+              setIsCreateOpen(true);
+            }}
+            className="btn-hover rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+          >
+            יצירת משימה
+          </button>
         </header>
 
+        {/* Main grid */}
         <div className="grid h-[calc(100vh-124px)] gap-4 lg:grid-cols-[360px,1fr]">
-          <div className="glass relative z-20 rounded-3xl p-4">
-            <div className="text-xs uppercase tracking-[0.3em] text-slate-400">סינון</div>
-            <div className="mt-4 space-y-5">
-              <input
-                value={search}
-                onChange={event => setSearch(event.target.value)}
-                placeholder="חיפוש לפי מזהה"
-                className="w-full rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-              />
+          <FilterSidebar
+            search={search}
+            onSearchChange={setSearch}
+            filterType={filterType}
+            onFilterTypeChange={setFilterType}
+            myTasksOnly={myTasksOnly}
+            onMyTasksOnlyChange={setMyTasksOnly}
+            materialFilter={materialFilter}
+            onMaterialFilterChange={setMaterialFilter}
+            materialOptions={materialOptions}
+            sourceFilter={sourceFilter}
+            onSourceFilterChange={setSourceFilter}
+            sourceOptions={sourceOptions}
+            targetFilter={targetFilter}
+            onTargetFilterChange={setTargetFilter}
+            targetOptions={targetOptions}
+            pollSeconds={pollSeconds}
+            onPollSecondsChange={setPollSeconds}
+            onResetAll={resetAllFilters}
+            hasActiveFilters={hasActiveFilters}
+            message={message}
+          />
 
-              <div>
-                <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">סוג משימה</label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "all", label: "הכל" },
-                    { value: "reflow", label: "ריפלו" },
-                    { value: "hermetics", label: "הרמטיות" },
-                    { value: "other", label: "אחר" }
-                  ].map(type => (
-                    <button
-                      key={type.value}
-                      type="button"
-                      onClick={() =>
-                        setFilterType(current =>
-                          current === type.value && type.value !== "all" ? "all" : type.value
-                        )
-                      }
-                      className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
-                        filterType === type.value
-                          ? "bg-cyan-400/20 text-cyan-100"
-                          : "btn-hover border border-slate-600 text-slate-200"
-                      }`}
-                    >
-                      {type.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <TaskListPanel
+            tasks={filteredTasks}
+            totalCount={tasks.length}
+            isLoading={isLoadingTasks}
+            selectedTaskId={selectedTaskId}
+            onSelectTask={onOpenDetail}
+          />
+        </div>
 
-              <div>
-                <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">בעלות</label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMyTasksOnly(current => !current)}
-                    className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
-                      myTasksOnly
-                        ? "bg-cyan-400/20 text-cyan-100"
-                        : "btn-hover border border-slate-600 text-slate-200"
-                    }`}
-                  >
-                    המשימות שלי
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">סוג חומר</label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMaterialFilter("all")}
-                    className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
-                      materialFilter === "all"
-                        ? "bg-cyan-400/20 text-cyan-100"
-                        : "btn-hover border border-slate-600 text-slate-200"
-                    }`}
-                  >
-                    הכל
-                  </button>
-                  {materialOptions.map(option => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() =>
-                        setMaterialFilter(current => (current === option ? "all" : option))
-                      }
-                      className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
-                        materialFilter === option
-                          ? "bg-cyan-400/20 text-cyan-100"
-                          : "btn-hover border border-slate-600 text-slate-200"
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <FilterChips
-                label="מקור מידע"
-                value={sourceFilter}
-                options={sourceOptions}
-                onChange={setSourceFilter}
-                onReset={() => setSourceFilter("all")}
-              />
-
-              <FilterChips
-                label="יעד מידע"
-                value={targetFilter}
-                options={targetOptions}
-                onChange={setTargetFilter}
-                onReset={() => setTargetFilter("all")}
-              />
-
-              {(filterType !== "all" || materialFilter !== "all" || sourceFilter !== "all" || targetFilter !== "all" || myTasksOnly || search) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilterType("all");
-                    setMaterialFilter("all");
-                    setSourceFilter("all");
-                    setTargetFilter("all");
-                    setMyTasksOnly(false);
-                    setSearch("");
-                  }}
-                  className="btn-hover w-full rounded-lg border border-rose-500/60 px-3 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
-                >
-                  איפוס כל הסינונים
-                </button>
-              )}
-
-              <div className="flex items-center gap-3">
-                <label className="text-xs uppercase tracking-[0.2em] text-slate-400">רענון (ש')</label>
-                <div className="flex items-center overflow-hidden rounded-lg border border-slate-700">
-                  <button type="button" onClick={() => setPollSeconds(p => Math.max(2, p - 1))} className="btn-hover px-2 py-1 text-sm text-slate-300">−</button>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={pollSeconds}
-                    onChange={event => { const v = Number(event.target.value); if (!Number.isNaN(v) && v >= 2) setPollSeconds(v); }}
-                    className="w-12 border-x border-slate-700 bg-slate-900/70 py-1 text-center text-sm text-slate-100 outline-none"
-                  />
-                  <button type="button" onClick={() => setPollSeconds(p => p + 1)} className="btn-hover px-2 py-1 text-sm text-slate-300">+</button>
-                </div>
-              </div>
-            </div>
-            {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
-          </div>
-          <div className="glass relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl p-4">
-            <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-400">
-              <span>משימות</span>
-              <span>{filteredTasks.length}/{tasks.length}</span>
-            </div>
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pe-2">
-              {filteredTasks.map(task => (
-                <TaskCard
-                  key={task.taskId}
-                  task={task}
-                  selected={task.taskId === selectedTaskId}
-                  onSelect={onOpenDetail}
-                />
-              ))}
-              {isLoadingTasks && filteredTasks.length === 0 && (
-                <div className="space-y-3">
-                  <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
-                  <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
-                  <div className="h-20 w-full animate-pulse rounded-2xl border border-slate-700/70 bg-slate-900/70" />
-                </div>
-              )}
-              {!isLoadingTasks && filteredTasks.length === 0 && (
-                <div className="flex h-full items-center justify-center text-slate-400">
-                  <div className="text-center">
-                    <div className="text-sm">אין משימות</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-      </div>
-
+        {/* Modals */}
         {isCreateOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
-            onClick={() => setIsCreateOpen(false)}
-          >
-            <div
-              className="glass max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl p-6"
-              onClick={event => event.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">יצירת משימה</div>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
-                >
-                  סגור
-                </button>
-              </div>
-
-              <form className="space-y-3" onSubmit={onCreateTask}>
-                <input
-                  value={newTaskId}
-                  onChange={event => setNewTaskId(event.target.value)}
-                  placeholder="מזהה משימה"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                  required
-                />
-                <input
-                  value={newDescription}
-                  onChange={event => setNewDescription(event.target.value)}
-                  placeholder="תיאור"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                />
-                <div className="flex items-center gap-3">
-                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400">שניות חלוקה</label>
-                  <div className="flex items-center overflow-hidden rounded-xl border border-slate-700">
-                    <button type="button" onClick={() => setPartitionSizeSeconds(p => Math.max(1, p - 10))} className="btn-hover px-2.5 py-2 text-sm text-slate-300">−</button>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={partitionSizeSeconds}
-                      onChange={event => { const v = Number(event.target.value); if (!Number.isNaN(v) && v >= 1) setPartitionSizeSeconds(v); }}
-                      className="w-16 border-x border-slate-700 bg-slate-900/70 py-2 text-center text-sm text-slate-100 outline-none"
-                    />
-                    <button type="button" onClick={() => setPartitionSizeSeconds(p => p + 10)} className="btn-hover px-2.5 py-2 text-sm text-slate-300">+</button>
-                  </div>
-                </div>
-                <RangeEditor ranges={newRanges} onChange={setNewRanges} />
-                <button
-                  type="submit"
-                  disabled={isCreatingTask}
-                  className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
-                >
-                  {isCreatingTask ? "יוצר..." : "צור משימה"}
-                </button>
-              </form>
-              {message && <div className="mt-3 text-xs text-amber-200">{message}</div>}
-            </div>
-          </div>
+          <CreateTaskModal
+            onClose={() => setIsCreateOpen(false)}
+            onCreated={fetchTasks}
+            showMessage={showMessage}
+            currentUserName={currentUserName}
+            createTask={api.createTask}
+          />
         )}
 
         {isDetailOpen && selectedTask && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
-            onClick={onCloseDetail}
-          >
-            <div
-              className="glass flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl p-6"
-              onClick={event => event.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">פרטי משימה</div>
-                <button
-                  type="button"
-                  onClick={onCloseDetail}
-                  className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
-                >
-                  סגור
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto pe-2">
-              <TaskDetail
-                task={selectedTask}
-                progress={selectedProgress}
-                histogram={selectedHistogram}
-                isHistogramLoading={isHistogramLoading}
-                ranges={selectedRanges}
-                onDeleteTask={onDeleteTask}
-                onClearPartitions={onClearPartitions}
-                onDeleteRange={onDeleteRange}
-                onAddRange={onOpenAddRange}
-                onHistogramZoom={onHistogramZoom}
-                isDeletingTask={isDeletingTask}
-                isClearingPartitions={isClearingPartitions}
-                deletingRangeKey={deletingRangeKey}
-                deletingRangeMode={deletingRangeMode}
-                rangeDoneKey={rangeDoneKey}
-                rangeDoneMode={rangeDoneMode}
-                actionNote={actionNote}
-              />
-              </div>
-            </div>
-          </div>
+          <TaskDetailModal
+            task={selectedTask}
+            progress={selectedProgress}
+            histogram={selectedHistogram}
+            isHistogramLoading={isHistogramLoading}
+            ranges={selectedRanges}
+            onClose={onCloseDetail}
+            onDeleteTask={onDeleteTask}
+            onClearPartitions={onClearPartitions}
+            onDeleteRange={onDeleteRange}
+            onAddRange={() => setIsAddRangeOpen(true)}
+            onHistogramZoom={onHistogramZoom}
+            isDeletingTask={isDeletingTask}
+            isClearingPartitions={isClearingPartitions}
+            deletingRangeKey={deletingRangeKey}
+            deletingRangeMode={deletingRangeMode}
+            rangeDoneKey={rangeDoneKey}
+            rangeDoneMode={rangeDoneMode}
+            actionNote={actionNote}
+          />
         )}
 
         {isAddRangeOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4"
-            onClick={() => setIsAddRangeOpen(false)}
-          >
-            <div
-              className="glass max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl p-6"
-              onClick={event => event.stopPropagation()}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-xs uppercase tracking-[0.3em] text-slate-400">הוספת טווח</div>
-                <button
-                  type="button"
-                  onClick={() => setIsAddRangeOpen(false)}
-                  className="btn-hover rounded-lg border border-slate-600 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-200 transition"
-                >
-                  סגור
-                </button>
-              </div>
-
-              <form className="space-y-5" onSubmit={onAddRange}>
-                <div>
-                  <label className="mb-1.5 block text-xs text-slate-400">זמן התחלה</label>
-                  <DatePicker
-                    selected={addRangeFrom ? new Date(addRangeFrom) : null}
-                    onChange={(date: Date | null) => setAddRangeFrom(date ? toLocalDateTimeValue(date) : "")}
-                    showTimeSelect
-                    timeIntervals={5}
-                    timeFormat="HH:mm"
-                    dateFormat="yyyy-MM-dd HH:mm"
-                    className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                    placeholderText="זמן התחלה"
-                    required
-                    popperContainer={({ children }) => createPortal(children, document.body)}
-                    popperClassName="date-picker-popper"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs text-slate-400">זמן סיום</label>
-                  <DatePicker
-                    selected={addRangeTo ? new Date(addRangeTo) : null}
-                    onChange={(date: Date | null) => setAddRangeTo(date ? toLocalDateTimeValue(date) : "")}
-                    showTimeSelect
-                    timeIntervals={5}
-                    timeFormat="HH:mm"
-                    dateFormat="yyyy-MM-dd HH:mm"
-                    className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-                    placeholderText="זמן סיום"
-                    required
-                    popperContainer={({ children }) => createPortal(children, document.body)}
-                    popperClassName="date-picker-popper"
-                  />
-                </div>
-                {addRangeFrom && addRangeTo && !addRangeInvalid && (() => {
-                  const diffMs = new Date(addRangeTo).getTime() - new Date(addRangeFrom).getTime();
-                  const weeks = Math.floor(diffMs / 604_800_000);
-                  const days = Math.floor((diffMs % 604_800_000) / 86_400_000);
-                  const hours = Math.floor((diffMs % 86_400_000) / 3_600_000);
-                  const minutes = Math.floor((diffMs % 3_600_000) / 60_000);
-                  const parts: string[] = [];
-                  if (weeks > 0) parts.push(`${weeks} שבועות`);
-                  if (days > 0) parts.push(`${days} ימים`);
-                  if (hours > 0) parts.push(`${hours} שעות`);
-                  if (minutes > 0) parts.push(`${minutes} דקות`);
-                  const partitionSize = selectedTask?.partitionSizeSeconds;
-                  const bulkSize = partitionSize ? Math.ceil(diffMs / 1000 / partitionSize) : null;
-                  return (
-                    <div className="rounded-lg border border-slate-700/60 bg-slate-900/50 px-3 py-2 text-center text-xs text-slate-300">
-                      <span>גודל הטווח: <span className="font-medium text-cyan-200">{parts.join(" ו-") || "פחות מדקה"}</span></span>
-                      {bulkSize !== null && (
-                        <span className="mx-2 text-slate-600">|</span>
-                      )}
-                      {bulkSize !== null && (
-                        <span>מספר פרטישנים: <span className="font-medium text-cyan-200">{bulkSize.toLocaleString()}</span></span>
-                      )}
-                    </div>
-                  );
-                })()}
-                {addRangeInvalid && (
-                  <p className="text-xs text-rose-400">זמן הסיום חייב להיות אחרי זמן ההתחלה</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={isAddingRange || !!addRangeInvalid}
-                  className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200 disabled:opacity-50"
-                >
-                  {isAddingRange ? "מוסיף..." : "הוסף טווח"}
-                </button>
-              </form>
-            </div>
-          </div>
+          <AddRangeModal
+            onClose={() => setIsAddRangeOpen(false)}
+            onSubmit={onAddRangeSubmit}
+            currentUserName={currentUserName}
+            partitionSizeSeconds={selectedTask?.partitionSizeSeconds}
+            showMessage={showMessage}
+          />
         )}
       </div>
 
+      {/* Welcome overlay */}
       {!currentUserName && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 px-4">
-          <div className="glass w-full max-w-xl rounded-3xl border border-cyan-400/30 bg-slate-900/85 p-8 shadow-2xl shadow-cyan-900/20">
-            <div className="text-center">
-              <div className="text-xs uppercase tracking-[0.5em] text-cyan-300/80">WELCOME</div>
-              <h2 className="mt-3 text-3xl font-bold text-white">ברוך הבא ל־PBAR</h2>
-              <p className="mt-2 text-sm text-slate-300">כדי להתחיל, איך קוראים לך?</p>
-            </div>
-
-            <div className="mt-7 space-y-3">
-              <input
-                autoFocus
-                value={nameInput}
-                onChange={event => setNameInput(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key === "Enter") {
-                    onSaveUserName();
-                  }
-                }}
-                placeholder="הכנס שם"
-                className="w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-center text-base text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
-              />
-              <button
-                type="button"
-                onClick={onSaveUserName}
-                className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-3 text-sm uppercase tracking-[0.25em] text-emerald-200"
-              >
-                המשך
-              </button>
-              {message && <div className="text-center text-xs text-amber-200">{message}</div>}
-            </div>
-          </div>
-        </div>
+        <WelcomeScreen
+          nameInput={nameInput}
+          onNameInputChange={setNameInput}
+          onSubmit={onSaveUserName}
+          message={message}
+        />
       )}
     </div>
   );
