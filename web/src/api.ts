@@ -284,7 +284,20 @@ const mockApi = {
       items = items.filter(task => task.taskId.includes(params.search ?? ""));
     }
     if (params.type && params.type !== "all") {
-      items = items.filter(task => task.type === params.type);
+      const typeKey = params.type.toLowerCase();
+      items = items.filter(task => {
+        const taskId = task.taskId.toLowerCase();
+        if (typeKey === "reflow") {
+          return taskId.includes("reflow");
+        }
+        if (typeKey === "hermetics") {
+          return taskId.includes("hermetics");
+        }
+        if (typeKey === "other") {
+          return !taskId.includes("reflow") && !taskId.includes("hermetics");
+        }
+        return true;
+      });
     }
     if (params.createdBy) {
       const owner = params.createdBy;

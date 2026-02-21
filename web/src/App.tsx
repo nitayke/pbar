@@ -19,6 +19,7 @@ const toLocalISOString = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 const toLocalDateTimeValue = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const USER_NAME_STORAGE_KEY = "pbar.currentUserName";
 
 const buildRequestRanges = (ranges: RangeDraft[], createdBy: string): TaskRange[] =>
   ranges
@@ -130,6 +131,7 @@ export default function App() {
   const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
+  const [nameInput, setNameInput] = useState("");
   const [pollSeconds, setPollSeconds] = useState(5);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedRanges, setSelectedRanges] = useState<TaskRange[]>([]);
@@ -285,22 +287,24 @@ export default function App() {
   }, [selectedTaskId, selectedTask?.partitionSizeSeconds]);
 
   useEffect(() => {
-    const key = "pbar.currentUserName";
-    const existing = window.localStorage.getItem(key)?.trim();
+    const existing = window.localStorage.getItem(USER_NAME_STORAGE_KEY)?.trim();
     if (existing) {
       setCurrentUserName(existing);
-      return;
+      setNameInput(existing);
     }
+  }, []);
 
-    const input = window.prompt("מה השם שלך?")?.trim() ?? "";
-    if (!input) {
+  const onSaveUserName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) {
       showMessage("יש להזין שם משתמש כדי להמשיך.");
       return;
     }
 
-    window.localStorage.setItem(key, input);
-    setCurrentUserName(input);
-  }, [showMessage]);
+    window.localStorage.setItem(USER_NAME_STORAGE_KEY, trimmed);
+    setCurrentUserName(trimmed);
+    setMessage(null);
+  };
 
   useEffect(() => {
     if (!isCreateOpen && !isDetailOpen) {
@@ -884,6 +888,41 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {!currentUserName && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 px-4">
+          <div className="glass w-full max-w-xl rounded-3xl border border-cyan-400/30 bg-slate-900/85 p-8 shadow-2xl shadow-cyan-900/20">
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-[0.5em] text-cyan-300/80">WELCOME</div>
+              <h2 className="mt-3 text-3xl font-bold text-white">ברוך הבא ל־PBAR</h2>
+              <p className="mt-2 text-sm text-slate-300">כדי להתחיל, איך קוראים לך?</p>
+            </div>
+
+            <div className="mt-7 space-y-3">
+              <input
+                autoFocus
+                value={nameInput}
+                onChange={event => setNameInput(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === "Enter") {
+                    onSaveUserName();
+                  }
+                }}
+                placeholder="הכנס שם"
+                className="w-full rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-3 text-center text-base text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
+              />
+              <button
+                type="button"
+                onClick={onSaveUserName}
+                className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-3 text-sm uppercase tracking-[0.25em] text-emerald-200"
+              >
+                המשך
+              </button>
+              {message && <div className="text-center text-xs text-amber-200">{message}</div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

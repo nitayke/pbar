@@ -14,7 +14,6 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 // ── Options ─────────────────────────────────────────────────────────────
 builder.Services.Configure<PartitioningOptions>(builder.Configuration.GetSection("Partitioning"));
 builder.Services.Configure<MetricsOptions>(builder.Configuration.GetSection("Metrics"));
-builder.Services.Configure<UserAutocompleteOptions>(builder.Configuration.GetSection("Users"));
 
 // ── Repositories ────────────────────────────────────────────────────────
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -24,7 +23,6 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IPartitionService, PartitionService>();
 builder.Services.AddScoped<IRangeService, RangeService>();
 builder.Services.AddScoped<IHistogramService, HistogramService>();
-builder.Services.AddScoped<IUserService, UserService>();
 
 // ── Metrics background ─────────────────────────────────────────────────
 builder.Services.AddSingleton<TaskMetricsCache>();
@@ -52,7 +50,6 @@ app.UseCors("default");
 
 // ── Endpoints ───────────────────────────────────────────────────────────
 app.MapHealthEndpoints()
-   .MapUserEndpoints()
    .MapTaskEndpoints()
    .MapPartitionEndpoints()
    .MapRangeEndpoints()
