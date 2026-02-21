@@ -22,6 +22,21 @@ public static class PartitionEndpoints
             return Results.Ok(partitions);
         });
 
+        app.MapPost("/api/tasks/{taskId}/partitions/claim", async (
+            string taskId,
+            IPartitionService partitionService) =>
+        {
+            var (taskExists, partition) = await partitionService.ClaimNextPartitionAsync(taskId);
+
+            if (!taskExists)
+                return Results.NotFound();
+
+            if (partition is null)
+                return Results.NoContent();
+
+            return Results.Ok(partition);
+        });
+
         app.MapDelete("/api/tasks/{taskId}/partitions", async (string taskId, IPartitionService partitionService) =>
         {
             await partitionService.ClearPartitionsAsync(taskId);

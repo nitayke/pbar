@@ -24,6 +24,48 @@ public sealed class PartitionRepository : IPartitionRepository
             .ToListAsync();
     }
 
+    public async Task<TaskPartition?> ClaimNextAsync(string taskId, string todoStatus, string inProgressStatus)
+    {
+        const int maxAttempts = 20;
+
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            var candidate = await _db.TaskPartitions
+                .AsNoTracking()
+                .Where(p => p.TaskId == taskId && p.Status == todoStatus)
+                .OrderBy(p => p.TimeFrom)
+                .ThenBy(p => p.TimeTo)
+                .Select(p => new { p.TaskId, p.TimeFrom, p.TimeTo })
+                .FirstOrDefaultAsync();
+
+            if (candidate is null)
+            {
+                return null;
+            }
+
+            var updatedRows = await _db.TaskPartitions
+                .Where(p => p.TaskId == candidate.TaskId
+                            && p.TimeFrom == candidate.TimeFrom
+                            && p.TimeTo == candidate.TimeTo
+                            && p.Status == todoStatus)
+                .ExecuteUpdateAsync(updates => updates
+                    .SetProperty(p => p.Status, inProgressStatus));
+
+            if (updatedRows == 1)
+            {
+                return new TaskPartition
+                {
+                    TaskId = candidate.TaskId,
+                    TimeFrom = candidate.TimeFrom,
+                    TimeTo = candidate.TimeTo,
+                    Status = inProgressStatus
+                };
+            }
+        }
+
+        return null;
+    }
+
     public async Task<List<StatusCount>> GetStatusCountsAsync(string taskId)
     {
         return await _db.TaskPartitions
