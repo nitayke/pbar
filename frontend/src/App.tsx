@@ -200,6 +200,28 @@ export default function App() {
     })();
   }, [selectedTaskId, selectedTask?.partitionSizeSeconds, showMessage]);
 
+  useEffect(() => {
+    if (!selectedTaskId || !isDetailOpen) {
+      return;
+    }
+
+    const refreshLiveMetrics = async () => {
+      try {
+        const [progress, metrics] = await Promise.all([
+          api.getProgress(selectedTaskId),
+          api.getMetrics(selectedTaskId),
+        ]);
+        setSelectedProgress(progress);
+        setSelectedMetrics(metrics);
+      } catch (error) {
+        showMessage((error as Error).message);
+      }
+    };
+
+    const handle = setInterval(refreshLiveMetrics, pollSeconds * 1000);
+    return () => clearInterval(handle);
+  }, [selectedTaskId, isDetailOpen, pollSeconds, showMessage]);
+
   /* ── detail actions ───────────────────────────────────── */
   const onDeleteTask = async () => {
     if (!selectedTaskId) return;

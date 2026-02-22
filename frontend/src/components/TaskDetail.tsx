@@ -158,6 +158,9 @@ export default function TaskDetail({
               <div className="mt-2 text-xs text-slate-500">
                 משך: <span className="text-slate-400">{duration}</span>
               </div>
+              <div className="mt-1 text-xs text-slate-500">
+                נוצר על ידי: <span className="text-slate-300">{range.createdBy?.trim() || "לא ידוע"}</span>
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
