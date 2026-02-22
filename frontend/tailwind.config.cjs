@@ -5,11 +5,18 @@ module.exports = {
   	extend: {
   		fontFamily: {
   			display: [
-					'Space Grotesk',
-  				'sans-serif'
+					'PbarDisplay',
+					'Segoe UI Black',
+					'Segoe UI',
+					'Arial',
+					'Tahoma',
+					'sans-serif'
   			],
   			body: [
-  				'Heebo',
+					'Heebo',
+					'Segoe UI',
+					'Arial',
+					'Tahoma',
   				'sans-serif'
   			]
   		},
