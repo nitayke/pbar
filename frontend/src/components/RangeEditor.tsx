@@ -11,8 +11,15 @@ type Props = {
   onChange: (ranges: RangeDraft[]) => void;
 };
 
+const createDraftId = () => {
+  if (typeof globalThis !== "undefined" && globalThis.crypto && "randomUUID" in globalThis.crypto) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `range-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const newRange = (): RangeDraft => ({
-  id: crypto.randomUUID(),
+  id: createDraftId(),
   timeFrom: "",
   timeTo: ""
 });
