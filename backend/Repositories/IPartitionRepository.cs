@@ -11,7 +11,7 @@ public interface IPartitionRepository
     Task<List<PartitionRow>> GetHistogramRowsAsync(string taskId, DateTime? from, DateTime? to);
     Task CreateBatchAsync(IEnumerable<TaskPartition> partitions);
     Task DeleteByTaskIdAsync(string taskId);
-    Task DeleteByRangeAsync(string taskId, DateTime from, DateTime to);
+    Task DeleteByRangeIdAsync(string taskId, string rangeId);
 }
 
 public sealed class StatusCount

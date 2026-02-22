@@ -18,6 +18,7 @@ export type TaskSummary = {
 };
 
 export type TaskRange = {
+  rangeId?: string;
   timeFrom: string;
   timeTo: string;
   creationTime?: string;

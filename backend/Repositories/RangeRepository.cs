@@ -41,6 +41,13 @@ public sealed class RangeRepository : IRangeRepository
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
     }
 
+    public async Task<TaskTimeRange?> GetByIdentityAsync(string taskId, DateTime from, DateTime to)
+    {
+        return await _db.TaskTimeRanges
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.TaskId == taskId && r.TimeFrom == from && r.TimeTo == to);
+    }
+
     public async Task CreateAsync(TaskTimeRange range)
     {
         _db.TaskTimeRanges.Add(range);
@@ -57,6 +64,13 @@ public sealed class RangeRepository : IRangeRepository
     {
         await _db.TaskTimeRanges
             .Where(r => r.TaskId == taskId && r.TimeFrom == from && r.TimeTo == to)
+            .ExecuteDeleteAsync();
+    }
+
+    public async Task DeleteByRangeIdAsync(string rangeId)
+    {
+        await _db.TaskTimeRanges
+            .Where(r => r.RangeId == rangeId)
             .ExecuteDeleteAsync();
     }
 

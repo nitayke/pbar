@@ -62,6 +62,7 @@ public sealed class PartitionService : IPartitionService
 
         return (true, new ClaimedPartitionDto
         {
+            RangeId = claimed.RangeId,
             TaskId = claimed.TaskId,
             TimeFrom = claimed.TimeFrom,
             TimeTo = claimed.TimeTo,

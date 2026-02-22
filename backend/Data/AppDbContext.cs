@@ -29,6 +29,7 @@ public sealed class AppDbContext : DbContext
         {
             builder.ToTable("TASK_PARTITIONS");
             builder.HasKey(p => new { p.TaskId, p.TimeFrom, p.TimeTo });
+            builder.Property(p => p.RangeId).HasColumnName("RANGE_ID");
             builder.Property(p => p.TaskId).HasColumnName("TASK_ID");
             builder.Property(p => p.TimeFrom).HasColumnName("TIME_FROM");
             builder.Property(p => p.TimeTo).HasColumnName("TIME_TO");
@@ -38,12 +39,14 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<TaskTimeRange>(builder =>
         {
             builder.ToTable("TASK_TIME_RANGES");
-            builder.HasKey(r => new { r.TaskId, r.TimeFrom, r.TimeTo });
+            builder.HasKey(r => r.RangeId);
+            builder.Property(r => r.RangeId).HasColumnName("RANGE_ID").IsRequired();
             builder.Property(r => r.TaskId).HasColumnName("TASK_ID");
             builder.Property(r => r.TimeFrom).HasColumnName("TIME_FROM");
             builder.Property(r => r.TimeTo).HasColumnName("TIME_TO");
             builder.Property(r => r.CreationTime).HasColumnName("CREATION_TIME");
             builder.Property(r => r.CreatedBy).HasColumnName("CREATED_BY");
+            builder.HasIndex(r => new { r.TaskId, r.TimeFrom, r.TimeTo }).IsUnique();
         });
     }
 }

@@ -118,6 +118,7 @@ public sealed class TaskService : ITaskService
 
             rangeEntities.Add(new TaskTimeRange
             {
+                RangeId = Guid.NewGuid().ToString("N"),
                 TaskId = request.TaskId,
                 TimeFrom = range.TimeFrom,
                 TimeTo = range.TimeTo,
@@ -172,6 +173,7 @@ public sealed class TaskService : ITaskService
 
             yield return new TaskPartition
             {
+                RangeId = range.RangeId,
                 TaskId = taskId,
                 TimeFrom = cursor,
                 TimeTo = next,

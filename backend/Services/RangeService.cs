@@ -22,6 +22,7 @@ public sealed class RangeService : IRangeService
         var ranges = await _uow.Ranges.GetByTaskIdAsync(taskId);
         return ranges.Select(r => new TaskRangeDto
         {
+            RangeId = r.RangeId,
             TimeFrom = r.TimeFrom,
             TimeTo = r.TimeTo,
             CreationTime = r.CreationTime,
@@ -48,6 +49,7 @@ public sealed class RangeService : IRangeService
 
         var rangeEntity = new TaskTimeRange
         {
+            RangeId = Guid.NewGuid().ToString("N"),
             TaskId = taskId,
             TimeFrom = range.TimeFrom,
             TimeTo = range.TimeTo,
@@ -69,15 +71,26 @@ public sealed class RangeService : IRangeService
     public async Task DeleteRangeAsync(string taskId, DateTime from, DateTime to, string mode)
     {
         var normalized = mode.Trim().ToLowerInvariant();
+        var targetRange = await _uow.Ranges.GetByIdentityAsync(taskId, from, to);
 
         if (normalized is "partitions" or "all")
         {
-            await _uow.Partitions.DeleteByRangeAsync(taskId, from, to);
+            if (targetRange is not null)
+            {
+                await _uow.Partitions.DeleteByRangeIdAsync(taskId, targetRange.RangeId);
+            }
         }
 
         if (normalized is "range" or "all")
         {
-            await _uow.Ranges.DeleteAsync(taskId, from, to);
+            if (targetRange is not null)
+            {
+                await _uow.Ranges.DeleteByRangeIdAsync(targetRange.RangeId);
+            }
+            else
+            {
+                await _uow.Ranges.DeleteAsync(taskId, from, to);
+            }
         }
     }
 
@@ -92,6 +105,7 @@ public sealed class RangeService : IRangeService
 
             yield return new TaskPartition
             {
+                RangeId = range.RangeId,
                 TaskId = taskId,
                 TimeFrom = cursor,
                 TimeTo = next,

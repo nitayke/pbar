@@ -35,7 +35,7 @@ public sealed class PartitionRepository : IPartitionRepository
                 .Where(p => p.TaskId == taskId && p.Status == todoStatus)
                 .OrderBy(p => p.TimeFrom)
                 .ThenBy(p => p.TimeTo)
-                .Select(p => new { p.TaskId, p.TimeFrom, p.TimeTo })
+                .Select(p => new { p.RangeId, p.TaskId, p.TimeFrom, p.TimeTo })
                 .FirstOrDefaultAsync();
 
             if (candidate is null)
@@ -55,6 +55,7 @@ public sealed class PartitionRepository : IPartitionRepository
             {
                 return new TaskPartition
                 {
+                    RangeId = candidate.RangeId,
                     TaskId = candidate.TaskId,
                     TimeFrom = candidate.TimeFrom,
                     TimeTo = candidate.TimeTo,
@@ -137,10 +138,10 @@ public sealed class PartitionRepository : IPartitionRepository
         await _db.TaskPartitions.Where(p => p.TaskId == taskId).ExecuteDeleteAsync();
     }
 
-    public async Task DeleteByRangeAsync(string taskId, DateTime from, DateTime to)
+    public async Task DeleteByRangeIdAsync(string taskId, string rangeId)
     {
         await _db.TaskPartitions
-            .Where(p => p.TaskId == taskId && p.TimeFrom >= from && p.TimeTo <= to)
+            .Where(p => p.TaskId == taskId && p.RangeId == rangeId)
             .ExecuteDeleteAsync();
     }
 }
