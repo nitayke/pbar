@@ -11,6 +11,7 @@ public sealed class UnitOfWork : IUnitOfWork
     public ITaskRepository Tasks { get; }
     public IPartitionRepository Partitions { get; }
     public IRangeRepository Ranges { get; }
+    public IScheduledTaskRepository ScheduledTasks { get; }
 
     public UnitOfWork(IDbContextFactory<AppDbContext> factory)
     {
@@ -18,6 +19,7 @@ public sealed class UnitOfWork : IUnitOfWork
         Tasks = new TaskRepository(_db);
         Partitions = new PartitionRepository(_db);
         Ranges = new RangeRepository(_db);
+        ScheduledTasks = new ScheduledTaskRepository(_db);
     }
 
     public async Task BeginTransactionAsync()

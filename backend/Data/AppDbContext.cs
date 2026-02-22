@@ -12,6 +12,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<TaskEntity> Tasks => Set<TaskEntity>();
     public DbSet<TaskPartition> TaskPartitions => Set<TaskPartition>();
     public DbSet<TaskTimeRange> TaskTimeRanges => Set<TaskTimeRange>();
+    public DbSet<ScheduledTask> ScheduledTasks => Set<ScheduledTask>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +48,23 @@ public sealed class AppDbContext : DbContext
             builder.Property(r => r.CreationTime).HasColumnName("CREATION_TIME");
             builder.Property(r => r.CreatedBy).HasColumnName("CREATED_BY");
             builder.HasIndex(r => new { r.TaskId, r.TimeFrom, r.TimeTo }).IsUnique();
+        });
+
+        modelBuilder.Entity<ScheduledTask>(builder =>
+        {
+            builder.ToTable("SCHEDULED_TASKS");
+            builder.HasKey(s => s.ScheduleId);
+            builder.Property(s => s.ScheduleId).HasColumnName("SCHEDULE_ID").IsRequired();
+            builder.Property(s => s.TaskId).HasColumnName("TASK_ID");
+            builder.Property(s => s.IntervalSeconds).HasColumnName("INTERVAL_SECONDS");
+            builder.Property(s => s.BulkSizeSeconds).HasColumnName("BULK_SIZE_SECONDS");
+            builder.Property(s => s.LastExecutionTime).HasColumnName("LAST_EXECUTION_TIME");
+            builder.Property(s => s.NextExecutionTime).HasColumnName("NEXT_EXECUTION_TIME");
+            builder.Property(s => s.IsEnabled).HasColumnName("IS_ENABLED");
+            builder.Property(s => s.CreatedAt).HasColumnName("CREATED_AT");
+            builder.Property(s => s.CreatedBy).HasColumnName("CREATED_BY");
+            builder.HasIndex(s => s.TaskId);
+            builder.HasIndex(s => new { s.IsEnabled, s.NextExecutionTime });
         });
     }
 }

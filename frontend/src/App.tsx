@@ -18,6 +18,7 @@ import TaskListPanel from "./components/TaskListPanel";
 import CreateTaskModal from "./components/CreateTaskModal";
 import TaskDetailModal from "./components/TaskDetailModal";
 import AddRangeModal from "./components/AddRangeModal";
+import ScheduledTasksPanel from "./components/ScheduledTasksPanel";
 
 export default function App() {
   /* ── user ─────────────────────────────────────────────── */
@@ -149,6 +150,7 @@ export default function App() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAddRangeOpen, setIsAddRangeOpen] = useState(false);
+  const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
 
   const onOpenDetail = (taskId: string) => {
     setSelectedTaskId(taskId);
@@ -320,16 +322,25 @@ export default function App() {
               PBAR 2.0
             </h1>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              clearMessage();
-              setIsCreateOpen(true);
-            }}
-            className="btn-hover rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
-          >
-            יצירת משימה
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setIsScheduledTasksOpen(true)}
+              className="btn-hover rounded-xl border border-indigo-400/70 bg-indigo-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-indigo-200"
+            >
+              תזמונים
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearMessage();
+                setIsCreateOpen(true);
+              }}
+              className="btn-hover rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+            >
+              יצירת משימה
+            </button>
+          </div>
         </header>
 
         {/* Main grid */}
@@ -410,6 +421,18 @@ export default function App() {
             showMessage={showMessage}
           />
         )}
+
+        <ScheduledTasksPanel
+          visible={isScheduledTasksOpen}
+          onClose={() => setIsScheduledTasksOpen(false)}
+          tasks={tasks}
+          currentUserName={currentUserName}
+          showMessage={showMessage}
+          getScheduledTasks={api.getScheduledTasks}
+          createScheduledTask={api.createScheduledTask}
+          updateScheduledTask={api.updateScheduledTask}
+          deleteScheduledTask={api.deleteScheduledTask}
+        />
       </div>
 
       {/* Welcome overlay */}

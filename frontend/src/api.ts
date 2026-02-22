@@ -1,4 +1,7 @@
 import type {
+  ScheduledTask,
+  ScheduledTaskCreateRequest,
+  ScheduledTaskUpdateRequest,
   TaskCreateRequest,
   TaskMetrics,
   TaskProgress,
@@ -128,6 +131,31 @@ const mockRanges: Record<string, TaskRange[]> = {
     }
   ]
 };
+
+const mockScheduledTasks: ScheduledTask[] = [
+  {
+    scheduleId: "sch001",
+    taskId: "reflow-cars-elastic-west-to-elastic-east",
+    intervalSeconds: 3600,
+    bulkSizeSeconds: 3600,
+    lastExecutionTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    nextExecutionTime: new Date(Date.now() + 1000 * 60 * 30).toISOString(),
+    isEnabled: true,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    createdBy: "dana"
+  },
+  {
+    scheduleId: "sch002",
+    taskId: "hermetics-boys-oracle-east-to-elastic-west",
+    intervalSeconds: 7200,
+    bulkSizeSeconds: 7200,
+    lastExecutionTime: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+    nextExecutionTime: new Date(Date.now() + 1000 * 60 * 30).toISOString(),
+    isEnabled: false,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+    createdBy: "yossi"
+  }
+];
 
 const getLatestRangeCreation = (taskId: string) => {
   const ranges = mockRanges[taskId] ?? [];
@@ -444,6 +472,62 @@ const mockApi = {
     if (mode === "range" || mode === "all") {
       mockRanges[taskId] = list.filter(range => range.timeFrom !== from || range.timeTo !== to);
     }
+  },
+
+  // Scheduled Tasks
+  getScheduledTasks: async () => {
+    await delay(MOCK_DELAY_MS);
+    return [...mockScheduledTasks];
+  },
+
+  getScheduledTasksByTaskId: async (taskId: string) => {
+    await delay(MOCK_DELAY_MS);
+    return mockScheduledTasks.filter(s => s.taskId === taskId);
+  },
+
+  getScheduledTask: async (scheduleId: string) => {
+    await delay(MOCK_DELAY_MS);
+    return mockScheduledTasks.find(s => s.scheduleId === scheduleId);
+  },
+
+  createScheduledTask: async (req: ScheduledTaskCreateRequest) => {
+    await delay(MOCK_DELAY_MS);
+    if (!mockTasks.some(t => t.taskId === req.taskId)) {
+      throw new Error("Task not found");
+    }
+    const schedule: ScheduledTask = {
+      scheduleId: `sch${Date.now().toString(36)}`,
+      taskId: req.taskId,
+      intervalSeconds: req.intervalSeconds,
+      bulkSizeSeconds: req.bulkSizeSeconds,
+      lastExecutionTime: undefined,
+      nextExecutionTime: new Date().toISOString(),
+      isEnabled: true,
+      createdAt: new Date().toISOString(),
+      createdBy: req.createdBy || "system"
+    };
+    mockScheduledTasks.push(schedule);
+    return schedule;
+  },
+
+  updateScheduledTask: async (scheduleId: string, req: ScheduledTaskUpdateRequest) => {
+    await delay(MOCK_DELAY_MS);
+    const schedule = mockScheduledTasks.find(s => s.scheduleId === scheduleId);
+    if (!schedule) {
+      throw new Error("Schedule not found");
+    }
+    if (req.intervalSeconds !== undefined) schedule.intervalSeconds = req.intervalSeconds;
+    if (req.bulkSizeSeconds !== undefined) schedule.bulkSizeSeconds = req.bulkSizeSeconds;
+    if (req.isEnabled !== undefined) schedule.isEnabled = req.isEnabled;
+    return { ...schedule };
+  },
+
+  deleteScheduledTask: async (scheduleId: string) => {
+    await delay(MOCK_DELAY_MS);
+    const idx = mockScheduledTasks.findIndex(s => s.scheduleId === scheduleId);
+    if (idx >= 0) {
+      mockScheduledTasks.splice(idx, 1);
+    }
   }
 };
 
@@ -496,5 +580,26 @@ export const api = USE_MOCK
         request(
           `/tasks/${encodeURIComponent(taskId)}/ranges${buildQuery({ from, to, delete: mode })}`,
           { method: "DELETE" }
-        )
+        ),
+
+      // Scheduled Tasks
+      getScheduledTasks: () => request<ScheduledTask[]>(`/schedules`),
+
+      getScheduledTasksByTaskId: (taskId: string) =>
+        request<ScheduledTask[]>(`/schedules/task/${encodeURIComponent(taskId)}`),
+
+      getScheduledTask: (scheduleId: string) =>
+        request<ScheduledTask | undefined>(`/schedules/${encodeURIComponent(scheduleId)}`),
+
+      createScheduledTask: (req: ScheduledTaskCreateRequest) =>
+        request<ScheduledTask>(`/schedules`, { method: "POST", body: JSON.stringify(req) }),
+
+      updateScheduledTask: (scheduleId: string, req: ScheduledTaskUpdateRequest) =>
+        request<ScheduledTask>(`/schedules/${encodeURIComponent(scheduleId)}`, {
+          method: "PATCH",
+          body: JSON.stringify(req)
+        }),
+
+      deleteScheduledTask: (scheduleId: string) =>
+        request<void>(`/schedules/${encodeURIComponent(scheduleId)}`, { method: "DELETE" })
     };

@@ -14,6 +14,7 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 // ── Options ─────────────────────────────────────────────────────────────
 builder.Services.Configure<PartitioningOptions>(builder.Configuration.GetSection("Partitioning"));
 builder.Services.Configure<MetricsOptions>(builder.Configuration.GetSection("Metrics"));
+builder.Services.Configure<ScheduledTaskWorkerOptions>(builder.Configuration.GetSection("ScheduledWorker"));
 
 // ── Repositories ────────────────────────────────────────────────────────
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -23,10 +24,14 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IPartitionService, PartitionService>();
 builder.Services.AddScoped<IRangeService, RangeService>();
 builder.Services.AddScoped<IHistogramService, HistogramService>();
+builder.Services.AddScoped<IScheduledTaskService, ScheduledTaskService>();
 
 // ── Metrics background ─────────────────────────────────────────────────
 builder.Services.AddSingleton<TaskMetricsCache>();
 builder.Services.AddHostedService<TaskMetricsSampler>();
+
+// ── Scheduled tasks background worker ──────────────────────────────────
+builder.Services.AddHostedService<ScheduledTaskWorker>();
 
 // ── Swagger & CORS ──────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
@@ -50,6 +55,7 @@ app.UseCors("default");
 
 // ── Endpoints ───────────────────────────────────────────────────────────
 app.MapHealthEndpoints()
+   .MapScheduledTaskEndpoints()
    .MapTaskEndpoints()
    .MapPartitionEndpoints()
    .MapRangeEndpoints()

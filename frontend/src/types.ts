@@ -61,3 +61,28 @@ export type TaskCreateRequest = {
   partitionMinutes?: number;
   partitionSizeSeconds?: number;
 };
+
+export type ScheduledTask = {
+  scheduleId: string;
+  taskId: string;
+  intervalSeconds: number;
+  bulkSizeSeconds: number;
+  lastExecutionTime?: string;
+  nextExecutionTime?: string;
+  isEnabled: boolean;
+  createdAt: string;
+  createdBy: string;
+};
+
+export type ScheduledTaskCreateRequest = {
+  taskId: string;
+  intervalSeconds: number;
+  bulkSizeSeconds: number;
+  createdBy: string;
+};
+
+export type ScheduledTaskUpdateRequest = {
+  intervalSeconds?: number;
+  bulkSizeSeconds?: number;
+  isEnabled?: boolean;
+};
