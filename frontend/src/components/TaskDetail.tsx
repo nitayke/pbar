@@ -1,10 +1,11 @@
-import type { TaskProgress, TaskRange, TaskStatusHistogram, TaskSummary } from "../types";
+import type { TaskMetrics, TaskProgress, TaskRange, TaskStatusHistogram, TaskSummary } from "../types";
 import ProgressBar from "./ProgressBar";
 import StatusHistogramChart from "./StatusHistogramChart";
 
 type Props = {
   task: TaskSummary | null;
   progress: TaskProgress | null;
+  metrics: TaskMetrics | null;
   histogram: TaskStatusHistogram | null;
   isHistogramLoading: boolean;
   ranges: TaskRange[];
@@ -25,6 +26,7 @@ type Props = {
 export default function TaskDetail({
   task,
   progress,
+  metrics,
   histogram,
   isHistogramLoading,
   ranges,
@@ -51,7 +53,11 @@ export default function TaskDetail({
 
   const typeLabel =
     task.type === "reflow" ? "ריפלו" : task.type === "hermetics" ? "הרמטיות" : "אחר";
-  const effectiveProgress = progress ?? task.progress;
+  const effectiveProgress = metrics?.progress ?? progress ?? task.progress;
+  const estimatedFinish = metrics?.estimatedFinishUtc
+    ? new Date(metrics.estimatedFinishUtc)
+    : null;
+  const hasVelocity = typeof metrics?.partitionsPerMinute === "number" && metrics.partitionsPerMinute > 0;
 
   return (
     <div className="glass grid-glow rounded-3xl p-6">
@@ -71,6 +77,12 @@ export default function TaskDetail({
           <span>לביצוע: {effectiveProgress?.todo ?? 0}</span>
           <span>סה"כ: {effectiveProgress?.total ?? 0}</span>
           <span>גודל חלוקה: {task.partitionSizeSeconds ?? "-"} שניות</span>
+          {hasVelocity && (
+            <span>קצב: {metrics?.partitionsPerMinute?.toFixed(1)} פרטישנים/דקה</span>
+          )}
+          <span>
+            זמן סיום משוער: {estimatedFinish ? estimatedFinish.toLocaleString("he-IL") : "לא זמין"}
+          </span>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import type {
+  TaskMetrics,
   TaskProgress,
   TaskRange,
   TaskStatusHistogram,
@@ -132,6 +133,7 @@ export default function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedRanges, setSelectedRanges] = useState<TaskRange[]>([]);
   const [selectedProgress, setSelectedProgress] = useState<TaskProgress | null>(null);
+  const [selectedMetrics, setSelectedMetrics] = useState<TaskMetrics | null>(null);
   const [selectedHistogram, setSelectedHistogram] = useState<TaskStatusHistogram | null>(null);
   const [isHistogramLoading, setIsHistogramLoading] = useState(false);
   const [isDeletingTask, setIsDeletingTask] = useState(false);
@@ -161,6 +163,7 @@ export default function App() {
     setIsDetailOpen(false);
     setSelectedTaskId(null);
     setSelectedRanges([]);
+    setSelectedMetrics(null);
     setSelectedHistogram(null);
   }, []);
 
@@ -171,6 +174,7 @@ export default function App() {
   useEffect(() => {
     if (!selectedTaskId) {
       setSelectedHistogram(null);
+      setSelectedMetrics(null);
       setIsHistogramLoading(false);
       setIsDetailOpen(false);
       return;
@@ -178,13 +182,15 @@ export default function App() {
     (async () => {
       setIsHistogramLoading(true);
       try {
-        const [ranges, progress, histogram] = await Promise.all([
+        const [ranges, progress, metrics, histogram] = await Promise.all([
           api.getTaskRanges(selectedTaskId),
           api.getProgress(selectedTaskId),
+          api.getMetrics(selectedTaskId),
           api.getStatusHistogram(selectedTaskId, selectedTask?.partitionSizeSeconds),
         ]);
         setSelectedRanges(ranges);
         setSelectedProgress(progress);
+        setSelectedMetrics(metrics);
         setSelectedHistogram(histogram);
       } catch (error) {
         showMessage((error as Error).message);
@@ -341,6 +347,7 @@ export default function App() {
           <TaskDetailModal
             task={selectedTask}
             progress={selectedProgress}
+            metrics={selectedMetrics}
             histogram={selectedHistogram}
             isHistogramLoading={isHistogramLoading}
             ranges={selectedRanges}

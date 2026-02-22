@@ -1,9 +1,10 @@
-import type { TaskProgress, TaskRange, TaskStatusHistogram, TaskSummary } from "../types";
+import type { TaskMetrics, TaskProgress, TaskRange, TaskStatusHistogram, TaskSummary } from "../types";
 import TaskDetail from "./TaskDetail";
 
 type Props = {
   task: TaskSummary;
   progress: TaskProgress | null;
+  metrics: TaskMetrics | null;
   histogram: TaskStatusHistogram | null;
   isHistogramLoading: boolean;
   ranges: TaskRange[];
@@ -25,6 +26,7 @@ type Props = {
 export default function TaskDetailModal({
   task,
   progress,
+  metrics,
   histogram,
   isHistogramLoading,
   ranges,
@@ -68,6 +70,7 @@ export default function TaskDetailModal({
           <TaskDetail
             task={task}
             progress={progress}
+            metrics={metrics}
             histogram={histogram}
             isHistogramLoading={isHistogramLoading}
             ranges={ranges}
