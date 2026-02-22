@@ -8,6 +8,21 @@ type Props = {
   taskId?: string;
   partitionSizeSeconds?: number;
   onZoomRange?: (from: Date, to: Date) => void;
+  onResetZoom?: () => void;
+};
+
+const formatAxisDate = (value: string | number | Date) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleString("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 };
 
 const preferredStatusOrder = ["done", "completed", "complete", "in_progress", "inprogress", "running", "todo"];
@@ -52,7 +67,7 @@ const getStatusLabel = (status: string) => {
   return status;
 };
 
-export default function StatusHistogramChart({ histogram, isLoading, taskId, partitionSizeSeconds, onZoomRange }: Props) {
+export default function StatusHistogramChart({ histogram, isLoading, taskId, partitionSizeSeconds, onZoomRange, onResetZoom }: Props) {
   const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const chart = useMemo(() => {
@@ -115,7 +130,18 @@ export default function StatusHistogramChart({ histogram, isLoading, taskId, par
 
   return (
     <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4" dir="ltr">
-      <div className="text-xs uppercase tracking-[0.2em] text-slate-400">התפלגות סטטוסים לאורך זמן</div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xs uppercase tracking-[0.2em] text-slate-400">התפלגות סטטוסים לאורך זמן</div>
+        {onResetZoom && (
+          <button
+            type="button"
+            onClick={onResetZoom}
+            className="btn-hover rounded-lg border border-cyan-500/60 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-cyan-100"
+          >
+            איפוס זום
+          </button>
+        )}
+      </div>
 
       <div className="mt-4 rounded-xl border border-slate-700/70 bg-slate-950/60 p-2" dir="ltr">
         <ReactECharts
@@ -159,7 +185,20 @@ export default function StatusHistogramChart({ histogram, isLoading, taskId, par
             backgroundColor: "transparent",
             textStyle: { color: "#e2e8f0", fontFamily: "Heebo" },
             grid: { left: 30, right: 20, top: 40, bottom: 64, containLabel: true },
-            tooltip: { trigger: "axis" },
+            tooltip: {
+              trigger: "axis",
+              axisPointer: { type: "shadow" },
+              formatter: (params: any) => {
+                const points = Array.isArray(params) ? params : [params];
+                if (points.length === 0) return "";
+                const timestamp = points[0]?.value?.[0] ?? points[0]?.axisValue;
+                const header = `<div style=\"margin-bottom:6px;\">${formatAxisDate(timestamp)}</div>`;
+                const lines = points
+                  .map((p: any) => `${p.marker}${p.seriesName}: <b>${p.value?.[1] ?? p.data?.[1] ?? 0}</b>`)
+                  .join("<br/>");
+                return `${header}${lines}`;
+              }
+            },
             legend: {
               top: 0,
               right: 0,
@@ -169,7 +208,11 @@ export default function StatusHistogramChart({ histogram, isLoading, taskId, par
             },
             xAxis: {
               type: "time",
-              axisLabel: { color: "#94a3b8" },
+              axisLabel: {
+                color: "#94a3b8",
+                hideOverlap: true,
+                formatter: (value: string | number) => formatAxisDate(value)
+              },
               axisLine: { lineStyle: { color: "#334155" } },
               splitLine: { show: false }
             },

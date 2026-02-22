@@ -14,6 +14,7 @@ type Props = {
   onDeleteRange: (range: TaskRange, mode: string) => void;
   onAddRange: () => void;
   onHistogramZoom?: (from: Date, to: Date) => void;
+  onHistogramResetZoom?: () => void;
   isDeletingTask: boolean;
   isClearingPartitions: boolean;
   deletingRangeKey: string | null;
@@ -35,6 +36,7 @@ export default function TaskDetail({
   onDeleteRange,
   onAddRange,
   onHistogramZoom,
+  onHistogramResetZoom,
   isDeletingTask,
   isClearingPartitions,
   deletingRangeKey,
@@ -93,6 +95,7 @@ export default function TaskDetail({
           taskId={task.taskId}
           partitionSizeSeconds={task.partitionSizeSeconds}
           onZoomRange={onHistogramZoom}
+          onResetZoom={onHistogramResetZoom}
         />
       </div>
 

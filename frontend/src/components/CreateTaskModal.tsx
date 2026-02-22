@@ -27,11 +27,19 @@ export default function CreateTaskModal({
   const [partitionSizeSeconds, setPartitionSizeSeconds] = useState(300);
   const [isCreating, setIsCreating] = useState(false);
 
+  const taskIdPattern = /^[A-Za-z0-9-]+$/;
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
     if (!currentUserName.trim()) {
       showMessage("יש להזין שם משתמש לפני יצירת משימה.");
+      return;
+    }
+
+    const normalizedTaskId = taskId.trim();
+    if (!taskIdPattern.test(normalizedTaskId)) {
+      showMessage("מזהה משימה יכול להכיל רק אותיות באנגלית, מספרים ומקף (-).");
       return;
     }
 
@@ -45,7 +53,7 @@ export default function CreateTaskModal({
 
     setIsCreating(true);
     const payload: TaskCreateRequest = {
-      taskId: taskId.trim(),
+      taskId: normalizedTaskId,
       description,
       ranges: buildRequestRanges(ranges, currentUserName),
       partitionSizeSeconds,

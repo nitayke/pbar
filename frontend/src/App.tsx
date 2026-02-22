@@ -103,10 +103,6 @@ export default function App() {
   const unique = <T,>(arr: (T | undefined)[]) =>
     Array.from(new Set(arr.filter((v): v is T => Boolean(v)))).sort() as T[];
 
-  const materialOptions = useMemo(
-    () => unique(taskMetas.map(({ meta }) => meta.materialType)),
-    [taskMetas]
-  );
   const sourceOptions = useMemo(
     () => unique(taskMetas.map(({ meta }) => meta.sourceSystem)),
     [taskMetas]
@@ -296,6 +292,22 @@ export default function App() {
     }
   };
 
+  const onHistogramResetZoom = async () => {
+    if (!selectedTaskId) return;
+    setIsHistogramLoading(true);
+    try {
+      const histogram = await api.getStatusHistogram(
+        selectedTaskId,
+        selectedTask?.partitionSizeSeconds
+      );
+      setSelectedHistogram(histogram);
+    } catch (error) {
+      showMessage((error as Error).message);
+    } finally {
+      setIsHistogramLoading(false);
+    }
+  };
+
   /* ── render ───────────────────────────────────────────── */
   return (
     <div className="relative h-screen overflow-hidden px-6 py-6 text-right text-white" dir="rtl">
@@ -331,7 +343,6 @@ export default function App() {
             onMyTasksOnlyChange={setMyTasksOnly}
             materialFilter={materialFilter}
             onMaterialFilterChange={setMaterialFilter}
-            materialOptions={materialOptions}
             sourceFilter={sourceFilter}
             onSourceFilterChange={setSourceFilter}
             sourceOptions={sourceOptions}
@@ -379,6 +390,7 @@ export default function App() {
             onDeleteRange={onDeleteRange}
             onAddRange={() => setIsAddRangeOpen(true)}
             onHistogramZoom={onHistogramZoom}
+            onHistogramResetZoom={onHistogramResetZoom}
             isDeletingTask={isDeletingTask}
             isClearingPartitions={isClearingPartitions}
             deletingRangeKey={deletingRangeKey}

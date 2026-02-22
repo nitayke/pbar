@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using System.Text.RegularExpressions;
 using Pbar.Api.Contracts;
 using Pbar.Api.Models;
 using Pbar.Api.Repositories;
@@ -8,6 +9,7 @@ namespace Pbar.Api.Services;
 
 public sealed class TaskService : ITaskService
 {
+    private static readonly Regex TaskIdPattern = new("^[A-Za-z0-9-]+$", RegexOptions.Compiled);
     private readonly IUnitOfWork _uow;
     private readonly PartitioningOptions _partitioningOptions;
 
@@ -84,6 +86,9 @@ public sealed class TaskService : ITaskService
     {
         if (string.IsNullOrWhiteSpace(request.TaskId))
             throw new ArgumentException("TaskId is required.");
+
+        if (!TaskIdPattern.IsMatch(request.TaskId.Trim()))
+            throw new ArgumentException("TaskId may contain only English letters, digits and hyphen (-).");
 
         if (await _uow.Tasks.ExistsAsync(request.TaskId))
             throw new InvalidOperationException("Task already exists.");

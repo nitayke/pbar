@@ -9,7 +9,6 @@ type Props = {
   onMyTasksOnlyChange: (value: boolean) => void;
   materialFilter: string;
   onMaterialFilterChange: (value: string) => void;
-  materialOptions: string[];
   sourceFilter: string;
   onSourceFilterChange: (value: string) => void;
   sourceOptions: string[];
@@ -30,6 +29,8 @@ const TASK_TYPES = [
   { value: "other", label: "אחר" },
 ] as const;
 
+const MATERIAL_TYPES = ["cars", "boys"] as const;
+
 export default function FilterSidebar({
   search,
   onSearchChange,
@@ -39,7 +40,6 @@ export default function FilterSidebar({
   onMyTasksOnlyChange,
   materialFilter,
   onMaterialFilterChange,
-  materialOptions,
   sourceFilter,
   onSourceFilterChange,
   sourceOptions,
@@ -120,18 +120,7 @@ export default function FilterSidebar({
             סוג חומר
           </label>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onMaterialFilterChange("all")}
-              className={`rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.2em] transition ${
-                materialFilter === "all"
-                  ? "bg-cyan-400/20 text-cyan-100"
-                  : "btn-hover border border-slate-600 text-slate-200"
-              }`}
-            >
-              הכל
-            </button>
-            {materialOptions.map((option) => (
+            {MATERIAL_TYPES.map((option) => (
               <button
                 key={option}
                 type="button"
