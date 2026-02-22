@@ -1,10 +1,8 @@
-import { type FormEvent, useState } from "react";
-import { createPortal } from "react-dom";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { type FormEvent, useMemo, useState } from "react";
 
 import type { TaskRange } from "../types";
-import { toLocalDateTimeValue, formatDuration } from "../lib/taskUtils";
+import { formatDuration, toLocalISOString } from "../lib/taskUtils";
+import RangeEditor, { type RangeDraft, newRangeDraft } from "./RangeEditor";
 
 type Props = {
   onClose: () => void;
@@ -21,9 +19,12 @@ export default function AddRangeModal({
   partitionSizeSeconds,
   showMessage,
 }: Props) {
-  const [rangeFrom, setRangeFrom] = useState("");
-  const [rangeTo, setRangeTo] = useState("");
+  const [ranges, setRanges] = useState<RangeDraft[]>(() => [newRangeDraft()]);
   const [isAdding, setIsAdding] = useState(false);
+
+  const currentRange = ranges[0];
+  const rangeFrom = currentRange?.timeFrom ?? "";
+  const rangeTo = currentRange?.timeTo ?? "";
 
   const isInvalid =
     rangeFrom && rangeTo && new Date(rangeTo) <= new Date(rangeFrom);
@@ -40,8 +41,8 @@ export default function AddRangeModal({
     setIsAdding(true);
     try {
       await onSubmit({
-        timeFrom: new Date(rangeFrom).toISOString(),
-        timeTo: new Date(rangeTo).toISOString(),
+        timeFrom: toLocalISOString(new Date(rangeFrom)),
+        timeTo: toLocalISOString(new Date(rangeTo)),
         createdBy: currentUserName,
       });
       onClose();
@@ -61,6 +62,13 @@ export default function AddRangeModal({
     partitionSizeSeconds && diffMs > 0
       ? Math.ceil(diffMs / 1000 / partitionSizeSeconds)
       : null;
+
+  const normalizedRanges = useMemo(() => {
+    if (ranges.length === 0) {
+      return [newRangeDraft()];
+    }
+    return [ranges[0]];
+  }, [ranges]);
 
   return (
     <div
@@ -85,47 +93,11 @@ export default function AddRangeModal({
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <label className="mb-1.5 block text-xs text-slate-400">זמן התחלה</label>
-            <DatePicker
-              selected={rangeFrom ? new Date(rangeFrom) : null}
-              onChange={(date: Date | null) =>
-                setRangeFrom(date ? toLocalDateTimeValue(date) : "")
-              }
-              showTimeSelect
-              timeIntervals={5}
-              timeFormat="HH:mm"
-              dateFormat="yyyy-MM-dd HH:mm"
-              className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-              placeholderText="זמן התחלה"
-              required
-              popperContainer={({ children }) =>
-                createPortal(children, document.body)
-              }
-              popperClassName="date-picker-popper"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs text-slate-400">זמן סיום</label>
-            <DatePicker
-              selected={rangeTo ? new Date(rangeTo) : null}
-              onChange={(date: Date | null) =>
-                setRangeTo(date ? toLocalDateTimeValue(date) : "")
-              }
-              showTimeSelect
-              timeIntervals={5}
-              timeFormat="HH:mm"
-              dateFormat="yyyy-MM-dd HH:mm"
-              className="date-input w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
-              placeholderText="זמן סיום"
-              required
-              popperContainer={({ children }) =>
-                createPortal(children, document.body)
-              }
-              popperClassName="date-picker-popper"
-            />
-          </div>
+          <RangeEditor
+            ranges={normalizedRanges}
+            onChange={(next) => setRanges(next.length === 0 ? [newRangeDraft()] : [next[0]])}
+            allowMultiple={false}
+          />
 
           {rangeFrom && rangeTo && !isInvalid && (
             <div className="rounded-lg border border-slate-700/60 bg-slate-900/50 px-3 py-2 text-center text-xs text-slate-300">

@@ -18,8 +18,8 @@ export const buildRequestRanges = (
   ranges
     .filter((range) => range.timeFrom && range.timeTo)
     .map((range) => ({
-      timeFrom: new Date(range.timeFrom).toISOString(),
-      timeTo: new Date(range.timeTo).toISOString(),
+      timeFrom: toLocalISOString(new Date(range.timeFrom)),
+      timeTo: toLocalISOString(new Date(range.timeTo)),
       createdBy,
     }));
 

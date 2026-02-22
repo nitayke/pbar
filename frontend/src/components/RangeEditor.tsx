@@ -9,6 +9,7 @@ export type RangeDraft = TaskRange & { id: string };
 type Props = {
   ranges: RangeDraft[];
   onChange: (ranges: RangeDraft[]) => void;
+  allowMultiple?: boolean;
 };
 
 const createDraftId = () => {
@@ -18,7 +19,7 @@ const createDraftId = () => {
   return `range-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-const newRange = (): RangeDraft => ({
+export const newRangeDraft = (): RangeDraft => ({
   id: createDraftId(),
   timeFrom: "",
   timeTo: ""
@@ -42,7 +43,9 @@ const parseLocalDateTime = (value: string) => {
 const popperContainer = ({ children }: { children: React.ReactNode }) =>
   createPortal(children, document.body);
 
-export default function RangeEditor({ ranges, onChange }: Props) {
+export default function RangeEditor({ ranges, onChange, allowMultiple = true }: Props) {
+  const effectiveRanges = allowMultiple ? ranges : ranges.slice(0, 1);
+
   const updateRange = (id: string, field: "timeFrom" | "timeTo", value: string) => {
     onChange(
       ranges.map(range => (range.id === id ? { ...range, [field]: value } : range))
@@ -61,7 +64,7 @@ export default function RangeEditor({ ranges, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      {ranges.map(range => (
+      {effectiveRanges.map(range => (
         <div key={range.id} className="space-y-1">
         <div className="flex flex-wrap items-center gap-5">
           <DatePicker
@@ -88,26 +91,30 @@ export default function RangeEditor({ ranges, onChange }: Props) {
             popperContainer={popperContainer}
             popperClassName="date-picker-popper"
           />
-          <button
-            type="button"
-            onClick={() => removeRange(range.id)}
-            className="btn-hover rounded-lg border border-rose-500/60 px-3 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
-          >
-            הסר
-          </button>
+          {allowMultiple && (
+            <button
+              type="button"
+              onClick={() => removeRange(range.id)}
+              className="btn-hover rounded-lg border border-rose-500/60 px-3 py-2 text-xs uppercase tracking-[0.2em] text-rose-200"
+            >
+              הסר
+            </button>
+          )}
         </div>
         {isRangeInvalid(range) && (
           <p className="text-xs text-rose-400">זמן הסיום חייב להיות אחרי זמן ההתחלה</p>
         )}
         </div>
       ))}
-      <button
-        type="button"
-        onClick={() => onChange([...ranges, newRange()])}
-        className="btn-hover rounded-lg border border-slate-600 px-3 py-2 text-xs uppercase tracking-[0.2em] text-slate-200"
-      >
-        הוסף טווח
-      </button>
+      {allowMultiple && (
+        <button
+          type="button"
+          onClick={() => onChange([...ranges, newRangeDraft()])}
+          className="btn-hover rounded-lg border border-slate-600 px-3 py-2 text-xs uppercase tracking-[0.2em] text-slate-200"
+        >
+          הוסף טווח
+        </button>
+      )}
     </div>
   );
 }
