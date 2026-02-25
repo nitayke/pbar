@@ -129,8 +129,36 @@ public sealed class PartitionRepository : IPartitionRepository
 
     public async Task CreateBatchAsync(IEnumerable<TaskPartition> partitions)
     {
-        _db.TaskPartitions.AddRange(partitions);
-        await _db.SaveChangesAsync();
+        var items = partitions as IList<TaskPartition> ?? partitions.ToList();
+        if (items.Count == 0) return;
+
+        // Use raw SQL for Oracle bulk insert – much faster than EF change tracking
+        // INSERT ALL INTO ... SELECT FROM DUAL
+        const int maxRowsPerStatement = 500; // Oracle limit ~1000 binds; keep safe
+        var offset = 0;
+        while (offset < items.Count)
+        {
+            var chunk = items.Skip(offset).Take(maxRowsPerStatement).ToList();
+            var sql = new System.Text.StringBuilder();
+            sql.Append("INSERT ALL ");
+
+            var parameters = new List<object>();
+            for (var i = 0; i < chunk.Count; i++)
+            {
+                var p = chunk[i];
+                sql.Append($"INTO \"TASK_PARTITIONS\" (\"RANGE_ID\",\"TASK_ID\",\"TIME_FROM\",\"TIME_TO\",\"STATUS\") VALUES ({{" +
+                    $"{i * 5}}},{{{i * 5 + 1}}},{{{i * 5 + 2}}},{{{i * 5 + 3}}},{{{i * 5 + 4}}}) ");
+                parameters.Add(p.RangeId);
+                parameters.Add(p.TaskId);
+                parameters.Add(p.TimeFrom);
+                parameters.Add(p.TimeTo);
+                parameters.Add(p.Status);
+            }
+            sql.Append("SELECT 1 FROM DUAL");
+
+            await _db.Database.ExecuteSqlRawAsync(sql.ToString(), parameters.ToArray());
+            offset += maxRowsPerStatement;
+        }
     }
 
     public async Task DeleteByTaskIdAsync(string taskId)

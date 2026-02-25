@@ -184,7 +184,7 @@ export default function App() {
           api.getTaskRanges(selectedTaskId),
           api.getProgress(selectedTaskId),
           api.getMetrics(selectedTaskId),
-          api.getStatusHistogram(selectedTaskId, selectedTask?.partitionSizeSeconds),
+          api.getStatusHistogram(selectedTaskId),
         ]);
         setSelectedRanges(ranges);
         setSelectedProgress(progress);
@@ -298,10 +298,7 @@ export default function App() {
     if (!selectedTaskId) return;
     setIsHistogramLoading(true);
     try {
-      const histogram = await api.getStatusHistogram(
-        selectedTaskId,
-        selectedTask?.partitionSizeSeconds
-      );
+      const histogram = await api.getStatusHistogram(selectedTaskId);
       setSelectedHistogram(histogram);
     } catch (error) {
       showMessage((error as Error).message);

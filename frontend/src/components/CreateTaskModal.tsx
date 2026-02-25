@@ -14,6 +14,11 @@ type Props = {
 
 import { useState } from "react";
 
+type SizeUnit = "seconds" | "minutes" | "hours";
+const UNIT_LABELS: Record<SizeUnit, string> = { seconds: "שניות", minutes: "דקות", hours: "שעות" };
+const UNIT_MULTIPLIER: Record<SizeUnit, number> = { seconds: 1, minutes: 60, hours: 3600 };
+const UNIT_STEP: Record<SizeUnit, number> = { seconds: 10, minutes: 1, hours: 1 };
+
 export default function CreateTaskModal({
   onClose,
   onCreated,
@@ -24,22 +29,32 @@ export default function CreateTaskModal({
   const [taskId, setTaskId] = useState("");
   const [description, setDescription] = useState("");
   const [ranges, setRanges] = useState<RangeDraft[]>([]);
-  const [partitionSizeSeconds, setPartitionSizeSeconds] = useState(300);
+  const [sizeValue, setSizeValue] = useState(5);
+  const [sizeUnit, setSizeUnit] = useState<SizeUnit>("minutes");
   const [isCreating, setIsCreating] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const partitionSizeSeconds = sizeValue * UNIT_MULTIPLIER[sizeUnit];
 
   const taskIdPattern = /^[A-Za-z0-9-]+$/;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    setStatusMsg(null);
 
     if (!currentUserName.trim()) {
-      showMessage("יש להזין שם משתמש לפני יצירת משימה.");
+      setStatusMsg({ text: "יש להזין שם משתמש לפני יצירת משימה.", type: "error" });
       return;
     }
 
     const normalizedTaskId = taskId.trim();
     if (!taskIdPattern.test(normalizedTaskId)) {
-      showMessage("מזהה משימה יכול להכיל רק אותיות באנגלית, מספרים ומקף (-).");
+      setStatusMsg({ text: "מזהה משימה יכול להכיל רק אותיות באנגלית, מספרים ומקף (-).", type: "error" });
+      return;
+    }
+
+    if (partitionSizeSeconds <= 0) {
+      setStatusMsg({ text: "גודל חלוקה חייב להיות חיובי.", type: "error" });
       return;
     }
 
@@ -47,11 +62,13 @@ export default function CreateTaskModal({
       (r) => r.timeFrom && r.timeTo && new Date(r.timeTo) <= new Date(r.timeFrom)
     );
     if (invalidRange) {
-      showMessage("זמן הסיום חייב להיות אחרי זמן ההתחלה בכל הטווחים");
+      setStatusMsg({ text: "זמן הסיום חייב להיות אחרי זמן ההתחלה בכל הטווחים", type: "error" });
       return;
     }
 
     setIsCreating(true);
+    setStatusMsg({ text: "יוצר משימה ופרטישנים... זה עלול לקחת זמן עבור טווחים גדולים.", type: "success" });
+
     const payload: TaskCreateRequest = {
       taskId: normalizedTaskId,
       description,
@@ -61,11 +78,11 @@ export default function CreateTaskModal({
 
     try {
       await createTask(payload);
-      showMessage("משימה נוצרה.", 3000);
+      setStatusMsg({ text: "משימה נוצרה בהצלחה!", type: "success" });
       onCreated();
-      onClose();
+      setTimeout(onClose, 1200);
     } catch (error) {
-      showMessage((error as Error).message);
+      setStatusMsg({ text: (error as Error).message, type: "error" });
     } finally {
       setIsCreating(false);
     }
@@ -93,6 +110,19 @@ export default function CreateTaskModal({
           </button>
         </div>
 
+        {/* Status banner */}
+        {statusMsg && (
+          <div
+            className={`mb-3 rounded-xl px-4 py-2.5 text-sm ${
+              statusMsg.type === "error"
+                ? "border border-red-500/50 bg-red-500/10 text-red-300"
+                : "border border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
+            }`}
+          >
+            {statusMsg.text}
+          </div>
+        )}
+
         <form className="space-y-3" onSubmit={handleSubmit}>
           <input
             value={taskId}
@@ -108,14 +138,14 @@ export default function CreateTaskModal({
             className="w-full rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm"
           />
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <label className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              שניות חלוקה
+              גודל חלוקה
             </label>
             <div className="flex items-center overflow-hidden rounded-xl border border-slate-700">
               <button
                 type="button"
-                onClick={() => setPartitionSizeSeconds((p) => Math.max(1, p - 10))}
+                onClick={() => setSizeValue((v) => Math.max(1, v - UNIT_STEP[sizeUnit]))}
                 className="btn-hover px-2.5 py-2 text-sm text-slate-300"
               >
                 −
@@ -123,21 +153,45 @@ export default function CreateTaskModal({
               <input
                 type="text"
                 inputMode="numeric"
-                value={partitionSizeSeconds}
+                value={sizeValue}
                 onChange={(e) => {
                   const v = Number(e.target.value);
-                  if (!Number.isNaN(v) && v >= 1) setPartitionSizeSeconds(v);
+                  if (!Number.isNaN(v) && v >= 1) setSizeValue(v);
                 }}
                 className="w-16 border-x border-slate-700 bg-slate-900/70 py-2 text-center text-sm text-slate-100 outline-none"
               />
               <button
                 type="button"
-                onClick={() => setPartitionSizeSeconds((p) => p + 10)}
+                onClick={() => setSizeValue((v) => v + UNIT_STEP[sizeUnit])}
                 className="btn-hover px-2.5 py-2 text-sm text-slate-300"
               >
                 +
               </button>
             </div>
+            <div className="flex overflow-hidden rounded-xl border border-slate-700">
+              {(Object.keys(UNIT_LABELS) as SizeUnit[]).map((unit) => (
+                <button
+                  key={unit}
+                  type="button"
+                  onClick={() => {
+                    const currentSeconds = sizeValue * UNIT_MULTIPLIER[sizeUnit];
+                    const newValue = Math.max(1, Math.round(currentSeconds / UNIT_MULTIPLIER[unit]));
+                    setSizeValue(newValue);
+                    setSizeUnit(unit);
+                  }}
+                  className={`px-3 py-2 text-xs transition ${
+                    sizeUnit === unit
+                      ? "bg-cyan-500/20 text-cyan-100"
+                      : "btn-hover text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {UNIT_LABELS[unit]}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-slate-500">
+              ({partitionSizeSeconds.toLocaleString()} שניות)
+            </span>
           </div>
 
           <RangeEditor ranges={ranges} onChange={setRanges} />
@@ -145,9 +199,9 @@ export default function CreateTaskModal({
           <button
             type="submit"
             disabled={isCreating}
-            className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200"
+            className="btn-hover w-full rounded-xl border border-emerald-400/70 bg-emerald-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-emerald-200 disabled:opacity-50"
           >
-            {isCreating ? "יוצר..." : "צור משימה"}
+            {isCreating ? "יוצר משימה..." : "צור משימה"}
           </button>
         </form>
       </div>

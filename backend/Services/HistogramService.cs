@@ -19,9 +19,9 @@ public sealed class HistogramService : IHistogramService
         var task = await _uow.Tasks.GetByIdAsync(taskId);
         if (task is null) return null;
 
-        var effectiveInterval = CalculateInterval(intervalSeconds, from, to, task.PartitionSizeSeconds);
-
         var rows = await _uow.Partitions.GetHistogramRowsAsync(taskId, from, to);
+
+        var effectiveInterval = CalculateInterval(intervalSeconds, from, to, task.PartitionSizeSeconds, rows);
 
         var buckets = new Dictionary<DateTime, Dictionary<string, long>>();
 
@@ -70,18 +70,32 @@ public sealed class HistogramService : IHistogramService
         };
     }
 
-    private static int CalculateInterval(int? intervalSeconds, DateTime? from, DateTime? to, int? partitionSizeSeconds)
+    private static int CalculateInterval(
+        int? intervalSeconds, DateTime? from, DateTime? to,
+        int? partitionSizeSeconds, List<PartitionRow> rows)
     {
         if (intervalSeconds.HasValue)
             return Math.Clamp(intervalSeconds.Value, 1, 86400);
 
-        if (from.HasValue && to.HasValue)
+        // Determine the effective time span from explicit bounds or from the data itself
+        DateTime? spanFrom = from;
+        DateTime? spanTo = to;
+        if ((!spanFrom.HasValue || !spanTo.HasValue) && rows.Count > 0)
         {
-            var span = to.Value - from.Value;
-            if (span.TotalDays <= 1) return 300;
-            if (span.TotalDays <= 7) return 1800;
-            if (span.TotalDays <= 30) return 3600;
-            return 14400;
+            spanFrom ??= rows.Min(r => r.TimeFrom);
+            spanTo ??= rows.Max(r => r.TimeFrom);
+        }
+
+        if (spanFrom.HasValue && spanTo.HasValue)
+        {
+            var span = spanTo.Value - spanFrom.Value;
+            if (span.TotalHours <= 6) return 300;          // 5 min buckets
+            if (span.TotalDays <= 1) return 900;            // 15 min buckets
+            if (span.TotalDays <= 3) return 1800;           // 30 min buckets
+            if (span.TotalDays <= 7) return 3600;           // 1 hour buckets
+            if (span.TotalDays <= 30) return 14400;         // 4 hour buckets
+            if (span.TotalDays <= 90) return 43200;         // 12 hour buckets
+            return 86400;                                   // 1 day buckets
         }
 
         return partitionSizeSeconds ?? 3600;
