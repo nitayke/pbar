@@ -79,6 +79,7 @@ export type ScheduledTaskCreateRequest = {
   intervalSeconds: number;
   bulkSizeSeconds: number;
   createdBy: string;
+  firstExecutionTime?: string;
 };
 
 export type ScheduledTaskUpdateRequest = {

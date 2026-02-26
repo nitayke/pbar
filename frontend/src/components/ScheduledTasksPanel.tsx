@@ -13,40 +13,27 @@ type Props = {
   deleteScheduledTask: (scheduleId: string) => Promise<void>;
 };
 
-const INTERVAL_OPTIONS = [
-  { label: "כל 15 דקות", value: 900 },
-  { label: "כל 30 דקות", value: 1800 },
-  { label: "כל שעה", value: 3600 },
-  { label: "כל שעתיים", value: 7200 },
-  { label: "כל 4 שעות", value: 14400 },
-  { label: "כל 8 שעות", value: 28800 },
-  { label: "כל 12 שעות", value: 43200 },
-  { label: "כל 24 שעות", value: 86400 },
-];
+type DhmsFields = { days: number; hours: number; minutes: number; seconds: number };
 
-const BULK_OPTIONS = [
-  { label: "15 דקות", value: 900 },
-  { label: "30 דקות", value: 1800 },
-  { label: "שעה", value: 3600 },
-  { label: "שעתיים", value: 7200 },
-  { label: "4 שעות", value: 14400 },
-  { label: "8 שעות", value: 28800 },
-  { label: "12 שעות", value: 43200 },
-  { label: "24 שעות", value: 86400 },
-];
+const dhmsToSeconds = (f: DhmsFields) =>
+  f.days * 86400 + f.hours * 3600 + f.minutes * 60 + f.seconds;
 
-const formatInterval = (seconds: number) => {
-  const opt = INTERVAL_OPTIONS.find((o) => o.value === seconds);
-  if (opt) return opt.label;
-  if (seconds < 3600) return `${Math.round(seconds / 60)} דק׳`;
-  return `${Math.round(seconds / 3600)} שעות`;
+const secondsToDhms = (totalSeconds: number): DhmsFields => {
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return { days, hours, minutes, seconds };
 };
 
-const formatBulk = (seconds: number) => {
-  const opt = BULK_OPTIONS.find((o) => o.value === seconds);
-  if (opt) return opt.label;
-  if (seconds < 3600) return `${Math.round(seconds / 60)} דק׳`;
-  return `${Math.round(seconds / 3600)} שעות`;
+const formatDuration = (totalSeconds: number) => {
+  const { days, hours, minutes, seconds } = secondsToDhms(totalSeconds);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+  return parts.join(" ");
 };
 
 const formatDatetime = (iso: string | undefined) => {
@@ -77,29 +64,20 @@ export default function ScheduledTasksPanel({
   // Create form state
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState("");
-  const [intervalSeconds, setIntervalSeconds] = useState(3600);
-  const [bulkSizeSeconds, setBulkSizeSeconds] = useState(3600);
+  const [intervalDhms, setIntervalDhms] = useState<DhmsFields>({ days: 0, hours: 1, minutes: 0, seconds: 0 });
+  const [bulkDhms, setBulkDhms] = useState<DhmsFields>({ days: 0, hours: 1, minutes: 0, seconds: 0 });
+  const [firstExecTime, setFirstExecTime] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // Dropdown open states
+  // Dropdown open state (only task picker)
   const [taskDropdownOpen, setTaskDropdownOpen] = useState(false);
-  const [intervalDropdownOpen, setIntervalDropdownOpen] = useState(false);
-  const [bulkDropdownOpen, setBulkDropdownOpen] = useState(false);
   const taskDropdownRef = useRef<HTMLDivElement>(null);
-  const intervalDropdownRef = useRef<HTMLDivElement>(null);
-  const bulkDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (taskDropdownRef.current && !taskDropdownRef.current.contains(event.target as Node)) {
         setTaskDropdownOpen(false);
-      }
-      if (intervalDropdownRef.current && !intervalDropdownRef.current.contains(event.target as Node)) {
-        setIntervalDropdownOpen(false);
-      }
-      if (bulkDropdownRef.current && !bulkDropdownRef.current.contains(event.target as Node)) {
-        setBulkDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -133,18 +111,33 @@ export default function ScheduledTasksPanel({
       showMessage("יש להזין שם משתמש");
       return;
     }
+    const intervalSeconds = dhmsToSeconds(intervalDhms);
+    const bulkSizeSeconds = dhmsToSeconds(bulkDhms);
+    if (intervalSeconds <= 0) {
+      showMessage("תדירות חייבת להיות גדולה מ-0");
+      return;
+    }
+    if (bulkSizeSeconds <= 0) {
+      showMessage("גודל חייב להיות גדול מ-0");
+      return;
+    }
 
     setIsCreating(true);
     try {
-      await createScheduledTask({
+      const req: ScheduledTaskCreateRequest = {
         taskId: selectedTaskId,
         intervalSeconds,
         bulkSizeSeconds,
         createdBy: currentUserName.trim(),
-      });
+      };
+      if (firstExecTime) {
+        req.firstExecutionTime = new Date(firstExecTime).toISOString();
+      }
+      await createScheduledTask(req);
       showMessage("תזמון נוצר", 3000);
       setShowCreate(false);
       setSelectedTaskId("");
+      setFirstExecTime("");
       await fetchSchedules();
     } catch (error) {
       showMessage((error as Error).message);
@@ -215,8 +208,11 @@ export default function ScheduledTasksPanel({
             <div className="text-xs uppercase tracking-[0.2em] text-slate-400">
               יצירת תזמון חדש
             </div>
+            <div className="text-xs text-amber-400/80">
+              * ניתן לתזמן רק משימה שכבר נוצרה במערכת
+            </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-3">
               {/* Task dropdown */}
               <div ref={taskDropdownRef} className="relative">
                 <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">
@@ -253,76 +249,23 @@ export default function ScheduledTasksPanel({
                 )}
               </div>
 
-              {/* Interval dropdown */}
-              <div ref={intervalDropdownRef} className="relative">
-                <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">
-                  תדירות
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIntervalDropdownOpen((prev) => !prev)}
-                  className="btn-hover flex w-full items-center justify-between rounded-lg border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
-                >
-                  <span>{INTERVAL_OPTIONS.find((o) => o.value === intervalSeconds)?.label}</span>
-                  <span className="text-slate-400">▾</span>
-                </button>
-                {intervalDropdownOpen && (
-                  <div className="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-600 bg-slate-950/95 p-1 shadow-lg shadow-slate-950/50">
-                    {INTERVAL_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setIntervalSeconds(opt.value);
-                          setIntervalDropdownOpen(false);
-                        }}
-                        className={`btn-hover mb-1 w-full rounded-lg px-3 py-2 text-right text-sm transition last:mb-0 ${
-                          intervalSeconds === opt.value
-                            ? "bg-cyan-500/20 text-cyan-100"
-                            : "text-slate-200 hover:bg-slate-800/80"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Interval – D / H / M / S */}
+              <DhmsInput label="תדירות" value={intervalDhms} onChange={setIntervalDhms} />
 
-              {/* Bulk size dropdown */}
-              <div ref={bulkDropdownRef} className="relative">
+              {/* Bulk size – D / H / M / S */}
+              <DhmsInput label="גודל טווח" value={bulkDhms} onChange={setBulkDhms} />
+
+              {/* First execution time */}
+              <div>
                 <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">
-                  גודל
+                  זמן ריצה ראשון (אופציונלי)
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setBulkDropdownOpen((prev) => !prev)}
-                  className="btn-hover flex w-full items-center justify-between rounded-lg border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20"
-                >
-                  <span>{BULK_OPTIONS.find((o) => o.value === bulkSizeSeconds)?.label}</span>
-                  <span className="text-slate-400">▾</span>
-                </button>
-                {bulkDropdownOpen && (
-                  <div className="absolute z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-600 bg-slate-950/95 p-1 shadow-lg shadow-slate-950/50">
-                    {BULK_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          setBulkSizeSeconds(opt.value);
-                          setBulkDropdownOpen(false);
-                        }}
-                        className={`btn-hover mb-1 w-full rounded-lg px-3 py-2 text-right text-sm transition last:mb-0 ${
-                          bulkSizeSeconds === opt.value
-                            ? "bg-cyan-500/20 text-cyan-100"
-                            : "text-slate-200 hover:bg-slate-800/80"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <input
+                  type="datetime-local"
+                  value={firstExecTime}
+                  onChange={(e) => setFirstExecTime(e.target.value)}
+                  className="w-full rounded-lg border border-slate-600 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20 [color-scheme:dark]"
+                />
               </div>
             </div>
 
@@ -358,8 +301,8 @@ export default function ScheduledTasksPanel({
                     {schedule.taskId}
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                    <span>תדירות: {formatInterval(schedule.intervalSeconds)}</span>
-                    <span>גודל: {formatBulk(schedule.bulkSizeSeconds)}</span>
+                    <span>תדירות: {formatDuration(schedule.intervalSeconds)}</span>
+                    <span>גודל טווח: {formatDuration(schedule.bulkSizeSeconds)}</span>
                     <span>ביצוע אחרון: {formatDatetime(schedule.lastExecutionTime)}</span>
                     <span>הבא: {formatDatetime(schedule.nextExecutionTime)}</span>
                   </div>
@@ -392,6 +335,57 @@ export default function ScheduledTasksPanel({
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ────────── D / H / M / S input group ────────── */
+function DhmsInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: DhmsFields;
+  onChange: (v: DhmsFields) => void;
+}) {
+  const clamp = (n: number, max: number) => Math.max(0, Math.min(max, Math.floor(n) || 0));
+
+  const update = (field: keyof DhmsFields, raw: string) => {
+    const n = parseInt(raw, 10) || 0;
+    const limits: Record<keyof DhmsFields, number> = { days: 365, hours: 23, minutes: 59, seconds: 59 };
+    onChange({ ...value, [field]: clamp(n, limits[field]) });
+  };
+
+  const inputCls =
+    "w-14 rounded-lg border border-slate-600 bg-slate-950/80 px-2 py-1.5 text-center text-sm text-slate-100 outline-none transition focus:border-cyan-400/70 focus:ring-2 focus:ring-cyan-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+
+  return (
+    <div>
+      <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-400">
+        {label}
+      </label>
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col items-center gap-0.5">
+          <input type="number" min={0} max={365} value={value.days} onChange={(e) => update("days", e.target.value)} className={inputCls} />
+          <span className="text-[10px] text-slate-500">ימים</span>
+        </div>
+        <span className="text-slate-500">:</span>
+        <div className="flex flex-col items-center gap-0.5">
+          <input type="number" min={0} max={23} value={value.hours} onChange={(e) => update("hours", e.target.value)} className={inputCls} />
+          <span className="text-[10px] text-slate-500">שעות</span>
+        </div>
+        <span className="text-slate-500">:</span>
+        <div className="flex flex-col items-center gap-0.5">
+          <input type="number" min={0} max={59} value={value.minutes} onChange={(e) => update("minutes", e.target.value)} className={inputCls} />
+          <span className="text-[10px] text-slate-500">דקות</span>
+        </div>
+        <span className="text-slate-500">:</span>
+        <div className="flex flex-col items-center gap-0.5">
+          <input type="number" min={0} max={59} value={value.seconds} onChange={(e) => update("seconds", e.target.value)} className={inputCls} />
+          <span className="text-[10px] text-slate-500">שניות</span>
+        </div>
       </div>
     </div>
   );

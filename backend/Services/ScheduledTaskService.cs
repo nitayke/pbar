@@ -54,6 +54,9 @@ public sealed class ScheduledTaskService : IScheduledTaskService
             throw new ArgumentException("BulkSizeSeconds must be positive");
 
         var now = DateTime.UtcNow;
+        var firstExec = request.FirstExecutionTime.HasValue
+            ? DateTime.SpecifyKind(request.FirstExecutionTime.Value, DateTimeKind.Utc)
+            : now;
         var schedule = new ScheduledTask
         {
             ScheduleId = Guid.NewGuid().ToString("N"),
@@ -61,7 +64,7 @@ public sealed class ScheduledTaskService : IScheduledTaskService
             IntervalSeconds = request.IntervalSeconds,
             BulkSizeSeconds = request.BulkSizeSeconds,
             LastExecutionTime = null,
-            NextExecutionTime = now,
+            NextExecutionTime = firstExec,
             IsEnabled = true,
             CreatedAt = now,
             CreatedBy = string.IsNullOrWhiteSpace(request.CreatedBy) ? "system" : request.CreatedBy.Trim()

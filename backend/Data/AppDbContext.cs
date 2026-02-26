@@ -18,7 +18,7 @@ public sealed class AppDbContext : DbContext
     {
         modelBuilder.Entity<TaskEntity>(builder =>
         {
-            builder.ToTable("TASKS");
+            builder.ToTable("FOXTROT_TASKS");
             builder.HasKey(t => t.TaskId);
             builder.Property(t => t.TaskId).HasColumnName("TASK_ID");
             builder.Property(t => t.Description).HasColumnName("DESCRIPTION");
@@ -28,8 +28,8 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<TaskPartition>(builder =>
         {
-            builder.ToTable("TASK_PARTITIONS");
-            builder.HasKey(p => new { p.TaskId, p.TimeFrom, p.TimeTo });
+            builder.ToTable("FOXTROT_TASK_PARTITIONS");
+            builder.HasKey(p => new { p.RangeId, p.TimeFrom });
             builder.Property(p => p.RangeId).HasColumnName("RANGE_ID");
             builder.Property(p => p.TaskId).HasColumnName("TASK_ID");
             builder.Property(p => p.TimeFrom).HasColumnName("TIME_FROM");
@@ -39,7 +39,7 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<TaskTimeRange>(builder =>
         {
-            builder.ToTable("TASK_TIME_RANGES");
+            builder.ToTable("FOXTROT_TASK_TIME_RANGES");
             builder.HasKey(r => r.RangeId);
             builder.Property(r => r.RangeId).HasColumnName("RANGE_ID").IsRequired();
             builder.Property(r => r.TaskId).HasColumnName("TASK_ID");
@@ -47,12 +47,11 @@ public sealed class AppDbContext : DbContext
             builder.Property(r => r.TimeTo).HasColumnName("TIME_TO");
             builder.Property(r => r.CreationTime).HasColumnName("CREATION_TIME");
             builder.Property(r => r.CreatedBy).HasColumnName("CREATED_BY");
-            builder.HasIndex(r => new { r.TaskId, r.TimeFrom, r.TimeTo }).IsUnique();
         });
 
         modelBuilder.Entity<ScheduledTask>(builder =>
         {
-            builder.ToTable("SCHEDULED_TASKS");
+            builder.ToTable("FOXTROT_SCHEDULED_TASKS");
             builder.HasKey(s => s.ScheduleId);
             builder.Property(s => s.ScheduleId).HasColumnName("SCHEDULE_ID").IsRequired();
             builder.Property(s => s.TaskId).HasColumnName("TASK_ID");

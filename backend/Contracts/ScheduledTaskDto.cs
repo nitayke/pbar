@@ -19,6 +19,7 @@ public sealed class ScheduledTaskCreateRequest
     public int IntervalSeconds { get; set; }
     public int BulkSizeSeconds { get; set; }
     public string CreatedBy { get; set; } = string.Empty;
+    public DateTime? FirstExecutionTime { get; set; }
 }
 
 public sealed class ScheduledTaskUpdateRequest

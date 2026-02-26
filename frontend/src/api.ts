@@ -501,7 +501,7 @@ const mockApi = {
       intervalSeconds: req.intervalSeconds,
       bulkSizeSeconds: req.bulkSizeSeconds,
       lastExecutionTime: undefined,
-      nextExecutionTime: new Date().toISOString(),
+      nextExecutionTime: req.firstExecutionTime ?? new Date().toISOString(),
       isEnabled: true,
       createdAt: new Date().toISOString(),
       createdBy: req.createdBy || "system"
